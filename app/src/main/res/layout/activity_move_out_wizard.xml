@@ -28,6 +28,13 @@
         android:paddingBottom="12dp" />
 
     <Button
+        android:id="@+id/buttonGenerateReport"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Generate Report" />
+
+    <Button
         android:id="@+id/buttonContinueMoveOut"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

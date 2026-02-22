@@ -12,6 +12,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MoveinMoveout">
         <activity
+            android:name=".BuildInfoActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ComparisonReportActivity"
+            android:exported="false" />
+        <activity
             android:name=".HomeActivity"
             android:exported="true">
             <intent-filter>

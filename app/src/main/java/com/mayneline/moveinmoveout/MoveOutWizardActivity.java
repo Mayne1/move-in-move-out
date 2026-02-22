@@ -32,6 +32,9 @@ public class MoveOutWizardActivity extends AppCompatActivity {
 
         findViewById(R.id.buttonContinueMoveOut).setOnClickListener(v ->
                 Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show());
+
+        findViewById(R.id.buttonGenerateReport).setOnClickListener(v ->
+                startActivity(new Intent(this, ComparisonReportActivity.class)));
     }
 
     private void openCaptureForItem(String roomName, String itemName) {
