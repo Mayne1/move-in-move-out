@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +36,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private RecyclerView recyclerComparison;
     private TextView textEmpty;
     private TextView textSummary;
+    private TextView textSeedDebug;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +46,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
         recyclerComparison = findViewById(R.id.recyclerComparison);
         textEmpty = findViewById(R.id.textEmpty);
         textSummary = findViewById(R.id.textSummary);
+        textSeedDebug = findViewById(R.id.textSeedDebug);
 
         recyclerComparison.setLayoutManager(new LinearLayoutManager(this));
         findViewById(R.id.buttonSeedDemo).setOnClickListener(v -> seedDemoPair());
@@ -140,7 +143,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
     }
 
     private String key(String room, String item) {
-        return room + "||" + item;
+        return normalizeKey(room) + "||" + normalizeKey(item);
     }
 
     private boolean isBlank(String value) {
@@ -150,8 +153,8 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private void seedDemoPair() {
         AppDatabase db = AppDatabase.getInstance(this);
         long now = System.currentTimeMillis();
-        String room = "Demo Room";
-        String item = "Demo Item";
+        String room = normalizeValue(" Demo Room ");
+        String item = normalizeValue(" Demo Item ");
         String baseName = sanitize(room) + "_" + sanitize(item) + "_" + now;
         File captureDir = getOrCreateCaptureDir();
         File moveInFile = new File(captureDir, "seed_in_" + baseName + ".jpg");
@@ -162,6 +165,25 @@ public class ComparisonReportActivity extends AppCompatActivity {
             writeSeedImage(moveOutFile, "MOVE_OUT");
             db.mediaDao().insert(new RoomItemMedia("MOVE_IN", room, item, moveInFile.getAbsolutePath(), now));
             db.mediaDao().insert(new RoomItemMedia("MOVE_OUT", room, item, moveOutFile.getAbsolutePath(), now + 1));
+
+            List<RoomItemMedia> moveInForKey = db.mediaDao().getMoveInMedia(room, item);
+            List<RoomItemMedia> moveOutForKey = db.mediaDao().getMoveOutMedia(room, item);
+            boolean moveInInserted = moveInForKey != null && !moveInForKey.isEmpty();
+            boolean moveOutInserted = moveOutForKey != null && !moveOutForKey.isEmpty();
+            int moveInTotal = db.mediaDao().getAllMoveIn().size();
+            int moveOutTotal = db.mediaDao().getAllMoveOut().size();
+
+            String debugText = "Seed result:\n"
+                    + "MOVE_IN inserted: " + (moveInInserted ? "YES" : "NO") + "\n"
+                    + "MOVE_OUT inserted: " + (moveOutInserted ? "YES" : "NO") + "\n"
+                    + "room: " + room + "\n"
+                    + "item: " + item + "\n"
+                    + "MOVE_IN path: " + moveInFile.getAbsolutePath() + "\n"
+                    + "MOVE_OUT path: " + moveOutFile.getAbsolutePath() + "\n"
+                    + "total counts after insert: Move In = " + moveInTotal + ", Move Out = " + moveOutTotal;
+            textSeedDebug.setText(debugText);
+            textSeedDebug.setVisibility(View.VISIBLE);
+
             loadComparisonRows();
             Toast.makeText(this, "Demo pair added", Toast.LENGTH_SHORT).show();
         } catch (IOException exception) {
@@ -198,5 +220,16 @@ public class ComparisonReportActivity extends AppCompatActivity {
 
     private String sanitize(String value) {
         return value.replaceAll("[^A-Za-z0-9_\\-]", "_");
+    }
+
+    private String normalizeValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase(Locale.US);
+    }
+
+    private String normalizeKey(String value) {
+        return normalizeValue(value);
     }
 }
