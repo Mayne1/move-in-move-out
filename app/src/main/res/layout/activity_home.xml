@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="Move In / Move Out"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/buttonMoveIn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Move In" />
+
+        <Button
+            android:id="@+id/buttonMoveOut"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Move Out" />
+
+        <Button
+            android:id="@+id/buttonReports"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Reports" />
+
+        <Button
+            android:id="@+id/buttonTimeline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Timeline" />
+
+        <Button
+            android:id="@+id/buttonRespectFilter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Respect Filter" />
+
+        <Button
+            android:id="@+id/buttonLegalTranslator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Legal Translator" />
+
+        <Button
+            android:id="@+id/buttonSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="64dp"
+            android:text="Settings" />
+    </LinearLayout>
+</ScrollView>

@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MoveinMoveout">
         <activity
-            android:name=".MainActivity"
+            android:name=".HomeActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -20,6 +20,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".SettingsActivity" />
+        <activity android:name=".ReportActivity" />
+        <activity android:name=".LegalTranslatorActivity" />
+        <activity android:name=".RespectFilterActivity" />
+        <activity android:name=".TimelineActivity" />
+        <activity android:name=".CaptureActivity" />
+        <activity android:name=".MoveOutWizardActivity" />
+        <activity android:name=".MoveInWizardActivity" />
+        <activity android:name=".MainActivity" />
     </application>
 
 </manifest>
