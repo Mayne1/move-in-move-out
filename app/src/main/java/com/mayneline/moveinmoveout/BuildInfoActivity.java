@@ -1,24 +1,29 @@
 package com.mayneline.moveinmoveout;
 
 import android.os.Bundle;
-
-import androidx.activity.EdgeToEdge;
+import android.widget.TextView;
+import com.mayneline.moveinmoveout.BuildConfig;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 public class BuildInfoActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_build_info);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
+
+        // Simple, no-BS UI so you can SEE the build info immediately.
+        TextView tv = new TextView(this);
+        tv.setPadding(40, 40, 40, 40);
+        tv.setTextSize(18f);
+
+        String text =
+                "Build Info\n\n" +
+                        "App ID: " + BuildConfig.APPLICATION_ID + "\n" +
+                        "Build Type: " + BuildConfig.BUILD_TYPE + "\n" +
+                        "Version Name: " + BuildConfig.VERSION_NAME + "\n" +
+                        "Version Code: " + BuildConfig.VERSION_CODE + "\n";
+
+        tv.setText(text);
+        setContentView(tv);
     }
 }

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "44769688051",
+    "project_id": "move-in-move-out-5dc9f",
+    "storage_bucket": "move-in-move-out-5dc9f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:44769688051:android:efedaea754af8086c3fa86",
+        "android_client_info": {
+          "package_name": "com.mayne.mimo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQ_rU4cIiHUGSud_W7EKI_SUORpPFQ1GM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:44769688051:android:48f3416f53539effc3fa86",
+        "android_client_info": {
+          "package_name": "com.mayneline.moveinmoveout"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQ_rU4cIiHUGSud_W7EKI_SUORpPFQ1GM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
