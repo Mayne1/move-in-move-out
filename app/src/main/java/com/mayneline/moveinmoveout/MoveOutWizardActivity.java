@@ -1,6 +1,7 @@
 package com.mayneline.moveinmoveout;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.Toast;
 
@@ -13,15 +14,19 @@ import com.mayneline.moveinmoveout.ui.InspectionChecklistAdapter;
 
 public class MoveOutWizardActivity extends AppCompatActivity {
     private static final String MODE_MOVE_OUT = "MOVE_OUT";
+    private static final String PREFS_NAME = "inspection_checklist_prefs";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_move_out_wizard);
 
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         RecyclerView recyclerChecklist = findViewById(R.id.recyclerChecklistMoveOut);
         recyclerChecklist.setLayoutManager(new LinearLayoutManager(this));
         recyclerChecklist.setAdapter(new InspectionChecklistAdapter(
+                MODE_MOVE_OUT,
+                prefs,
                 InspectionChecklistFactory.createBaselineSections(),
                 this::openCaptureForItem));
 

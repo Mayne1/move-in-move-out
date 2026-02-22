@@ -1,5 +1,6 @@
 package com.mayneline.moveinmoveout.ui;
 
+import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.mayneline.moveinmoveout.R;
 import com.mayneline.moveinmoveout.model.InspectionItem;
 import com.mayneline.moveinmoveout.model.RoomSection;
+import com.mayneline.moveinmoveout.util.PrefKeys;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,8 +41,17 @@ public class InspectionChecklistAdapter extends RecyclerView.Adapter<RecyclerVie
 
     private final List<ListEntry> entries;
     private final OnAddMediaClickListener listener;
+    private final String mode;
+    private final SharedPreferences prefs;
 
-    public InspectionChecklistAdapter(List<RoomSection> sections, OnAddMediaClickListener listener) {
+    public InspectionChecklistAdapter(
+            String mode,
+            SharedPreferences prefs,
+            List<RoomSection> sections,
+            OnAddMediaClickListener listener
+    ) {
+        this.mode = mode;
+        this.prefs = prefs;
         this.listener = listener;
         this.entries = flattenSections(sections);
     }
@@ -69,7 +80,7 @@ public class InspectionChecklistAdapter extends RecyclerView.Adapter<RecyclerVie
         if (holder instanceof RoomHeaderViewHolder) {
             ((RoomHeaderViewHolder) holder).bind(entry.roomName);
         } else if (holder instanceof InspectionItemViewHolder && entry.item != null) {
-            ((InspectionItemViewHolder) holder).bind(entry.roomName, entry.item, listener);
+            ((InspectionItemViewHolder) holder).bind(mode, prefs, entry.roomName, entry.item, listener);
         }
     }
 
@@ -105,21 +116,44 @@ public class InspectionChecklistAdapter extends RecyclerView.Adapter<RecyclerVie
     static class InspectionItemViewHolder extends RecyclerView.ViewHolder {
         private final CheckBox checkCompleted;
         private final TextView textItemName;
+        private final TextView textMediaCount;
         private final Button buttonAddMedia;
 
         InspectionItemViewHolder(@NonNull View itemView) {
             super(itemView);
             checkCompleted = itemView.findViewById(R.id.checkItemCompleted);
             textItemName = itemView.findViewById(R.id.textItemName);
+            textMediaCount = itemView.findViewById(R.id.textMediaCount);
             buttonAddMedia = itemView.findViewById(R.id.buttonAddMedia);
         }
 
-        void bind(String roomName, InspectionItem item, OnAddMediaClickListener listener) {
+        void bind(
+                String mode,
+                SharedPreferences prefs,
+                String roomName,
+                InspectionItem item,
+                OnAddMediaClickListener listener
+        ) {
+            String checkedKey = PrefKeys.makeCheckedKey(mode, roomName, item.getLabel());
+            String countKey = PrefKeys.makeCountKey(mode, roomName, item.getLabel());
+            boolean isChecked = prefs.getBoolean(checkedKey, false);
+            int mediaCount = prefs.getInt(countKey, 0);
+
             textItemName.setText(item.getLabel());
+            textMediaCount.setText("Media: " + mediaCount);
             checkCompleted.setOnCheckedChangeListener(null);
-            checkCompleted.setChecked(item.isChecked());
-            checkCompleted.setOnCheckedChangeListener((buttonView, isChecked) -> item.setChecked(isChecked));
-            buttonAddMedia.setOnClickListener(v -> listener.onAddMediaClicked(roomName, item.getLabel()));
+            checkCompleted.setChecked(isChecked);
+            checkCompleted.setOnCheckedChangeListener((buttonView, checked) -> {
+                item.setChecked(checked);
+                prefs.edit().putBoolean(checkedKey, checked).apply();
+            });
+
+            buttonAddMedia.setOnClickListener(v -> {
+                int updatedCount = prefs.getInt(countKey, 0) + 1;
+                prefs.edit().putInt(countKey, updatedCount).apply();
+                textMediaCount.setText("Media: " + updatedCount);
+                listener.onAddMediaClicked(roomName, item.getLabel());
+            });
         }
     }
 }
