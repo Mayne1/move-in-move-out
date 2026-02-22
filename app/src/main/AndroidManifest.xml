@@ -15,6 +15,9 @@
             android:name=".BuildInfoActivity"
             android:exported="false" />
         <activity
+            android:name=".SetupActivity"
+            android:exported="false" />
+        <activity
             android:name=".ComparisonReportActivity"
             android:exported="false" />
         <activity

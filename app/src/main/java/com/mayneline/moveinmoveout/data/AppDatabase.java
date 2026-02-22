@@ -6,7 +6,7 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-@Database(entities = {RoomItemMedia.class}, version = 1, exportSchema = false)
+@Database(entities = {RoomItemMedia.class, PropertyEntity.class, ChecklistItemEntity.class}, version = 2, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     public abstract MediaDao mediaDao();
 

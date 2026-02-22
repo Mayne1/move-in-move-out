@@ -13,11 +13,11 @@ public class HomeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_home);
 
         findViewById(R.id.buttonMoveIn).setOnClickListener(v ->
-                startActivity(new Intent(this, MoveInWizardActivity.class)));
+                openSetup("MOVE_IN"));
         findViewById(R.id.buttonMoveOut).setOnClickListener(v ->
-                startActivity(new Intent(this, MoveOutWizardActivity.class)));
+                openSetup("MOVE_OUT"));
         findViewById(R.id.buttonReports).setOnClickListener(v ->
-                startActivity(new Intent(this, ReportActivity.class)));
+                startActivity(new Intent(this, ComparisonReportActivity.class)));
         findViewById(R.id.buttonTimeline).setOnClickListener(v ->
                 startActivity(new Intent(this, TimelineActivity.class)));
         findViewById(R.id.buttonRespectFilter).setOnClickListener(v ->
@@ -26,5 +26,11 @@ public class HomeActivity extends AppCompatActivity {
                 startActivity(new Intent(this, LegalTranslatorActivity.class)));
         findViewById(R.id.buttonSettings).setOnClickListener(v ->
                 startActivity(new Intent(this, SettingsActivity.class)));
+    }
+
+    private void openSetup(String mode) {
+        Intent intent = new Intent(this, SetupActivity.class);
+        intent.putExtra("mode", mode);
+        startActivity(intent);
     }
 }

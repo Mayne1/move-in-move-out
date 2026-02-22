@@ -14,6 +14,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.mayneline.moveinmoveout.data.AppDatabase;
+import com.mayneline.moveinmoveout.data.ChecklistItemEntity;
+import com.mayneline.moveinmoveout.data.PropertyEntity;
 import com.mayneline.moveinmoveout.data.RoomItemMedia;
 import com.mayneline.moveinmoveout.model.ComparisonRow;
 import com.mayneline.moveinmoveout.ui.ComparisonReportAdapter;
@@ -24,19 +26,18 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 
 public class ComparisonReportActivity extends AppCompatActivity {
+    private static final String MODE_MOVE_IN = "MOVE_IN";
+    private static final String MODE_MOVE_OUT = "MOVE_OUT";
+
     private RecyclerView recyclerComparison;
     private TextView textEmpty;
     private TextView textSummary;
     private TextView textSeedDebug;
+    private long propertyId = -1L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,59 +50,79 @@ public class ComparisonReportActivity extends AppCompatActivity {
         textSeedDebug = findViewById(R.id.textSeedDebug);
 
         recyclerComparison.setLayoutManager(new LinearLayoutManager(this));
+        propertyId = getIntent().getLongExtra("propertyId", -1L);
         findViewById(R.id.buttonSeedDemo).setOnClickListener(v -> seedDemoPair());
         loadComparisonRows();
     }
 
     private void loadComparisonRows() {
         AppDatabase db = AppDatabase.getInstance(this);
-        List<RoomItemMedia> moveInEntries = db.mediaDao().getAllMoveIn();
-        List<RoomItemMedia> moveOutEntries = db.mediaDao().getAllMoveOut();
+        PropertyEntity property = resolveProperty(db);
+        if (property == null) {
+            textSummary.setText("No property checklist found.");
+            recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>()));
+            textEmpty.setVisibility(View.VISIBLE);
+            return;
+        }
 
-        Map<String, RoomItemMedia> latestMoveIn = toLatestByRoomItem(moveInEntries);
-        Map<String, RoomItemMedia> latestMoveOut = toLatestByRoomItem(moveOutEntries);
-
-        Set<String> allKeys = new HashSet<>();
-        allKeys.addAll(latestMoveIn.keySet());
-        allKeys.addAll(latestMoveOut.keySet());
-
-        List<String> sortedKeys = new ArrayList<>(allKeys);
-        Collections.sort(sortedKeys);
-
+        List<ChecklistItemEntity> checklistItems = db.mediaDao().getChecklistItemsForProperty(propertyId);
         List<ComparisonRow> rows = new ArrayList<>();
-        for (String key : sortedKeys) {
-            RoomItemMedia moveIn = latestMoveIn.get(key);
-            RoomItemMedia moveOut = latestMoveOut.get(key);
+        int moveInCount = 0;
+        int moveOutCount = 0;
 
-            String room = moveIn != null ? moveIn.room : moveOut.room;
-            String item = moveIn != null ? moveIn.item : moveOut.item;
+        for (ChecklistItemEntity checklistItem : checklistItems) {
+            RoomItemMedia moveIn = db.mediaDao().getLatestMediaForChecklistItem(MODE_MOVE_IN, propertyId, checklistItem.id);
+            RoomItemMedia moveOut = db.mediaDao().getLatestMediaForChecklistItem(MODE_MOVE_OUT, propertyId, checklistItem.id);
+
+            if (moveIn != null) {
+                moveInCount++;
+            }
+            if (moveOut != null) {
+                moveOutCount++;
+            }
+
             String moveInPath = moveIn != null ? moveIn.filePath : "";
             String moveOutPath = moveOut != null ? moveOut.filePath : "";
             String status = deriveStatus(moveInPath, moveOutPath);
 
-            rows.add(new ComparisonRow(room, item, moveInPath, moveOutPath, status));
+            rows.add(new ComparisonRow(
+                    checklistItem.roomName,
+                    checklistItem.itemName,
+                    moveInPath,
+                    moveOutPath,
+                    status
+            ));
         }
 
-        textSummary.setText("Move In entries: " + moveInEntries.size() + " | Move Out entries: " + moveOutEntries.size());
+        textSummary.setText(
+                "Property #" + property.id
+                        + " | " + property.addressLine
+                        + "\nMove In captured: " + moveInCount + " | Move Out captured: " + moveOutCount
+        );
         recyclerComparison.setAdapter(new ComparisonReportAdapter(rows));
-
-        if (rows.isEmpty()) {
-            textEmpty.setVisibility(View.VISIBLE);
-        } else {
-            textEmpty.setVisibility(View.GONE);
-        }
+        textEmpty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
-    private Map<String, RoomItemMedia> toLatestByRoomItem(List<RoomItemMedia> entries) {
-        Map<String, RoomItemMedia> map = new HashMap<>();
-        for (RoomItemMedia entry : entries) {
-            String key = key(entry.room, entry.item);
-            RoomItemMedia current = map.get(key);
-            if (current == null || entry.timestamp > current.timestamp) {
-                map.put(key, entry);
+    private PropertyEntity resolveProperty(AppDatabase db) {
+        if (propertyId > 0) {
+            PropertyEntity latest = db.mediaDao().getLatestProperty();
+            if (latest != null && latest.id == propertyId) {
+                return latest;
+            }
+
+            List<ChecklistItemEntity> items = db.mediaDao().getChecklistItemsForProperty(propertyId);
+            if (items != null && !items.isEmpty()) {
+                PropertyEntity fake = new PropertyEntity("Property " + propertyId, 0, 0, 0L);
+                fake.id = propertyId;
+                return fake;
             }
         }
-        return map;
+
+        PropertyEntity latest = db.mediaDao().getLatestProperty();
+        if (latest != null) {
+            propertyId = latest.id;
+        }
+        return latest;
     }
 
     private String deriveStatus(String moveInPath, String moveOutPath) {
@@ -142,10 +163,6 @@ public class ComparisonReportActivity extends AppCompatActivity {
         }
     }
 
-    private String key(String room, String item) {
-        return normalizeKey(room) + "||" + normalizeKey(item);
-    }
-
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
@@ -155,23 +172,35 @@ public class ComparisonReportActivity extends AppCompatActivity {
         long now = System.currentTimeMillis();
         String room = normalizeValue(" Demo Room ");
         String item = normalizeValue(" Demo Item ");
+
+        PropertyEntity property = new PropertyEntity("Demo Address", 1, 1, now);
+        long seededPropertyId = db.mediaDao().insertProperty(property);
+        ChecklistItemEntity checklistItem = new ChecklistItemEntity(seededPropertyId, room, item, 0);
+        db.mediaDao().insertChecklistItems(java.util.Collections.singletonList(checklistItem));
+        List<ChecklistItemEntity> seededItems = db.mediaDao().getChecklistItemsForProperty(seededPropertyId);
+        if (seededItems == null || seededItems.isEmpty()) {
+            Toast.makeText(this, "Failed to seed checklist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ChecklistItemEntity insertedItem = seededItems.get(0);
         String baseName = sanitize(room) + "_" + sanitize(item) + "_" + now;
         File captureDir = getOrCreateCaptureDir();
         File moveInFile = new File(captureDir, "seed_in_" + baseName + ".jpg");
         File moveOutFile = new File(captureDir, "seed_out_" + baseName + ".jpg");
 
         try {
-            writeSeedImage(moveInFile, "MOVE_IN");
-            writeSeedImage(moveOutFile, "MOVE_OUT");
-            db.mediaDao().insert(new RoomItemMedia("MOVE_IN", room, item, moveInFile.getAbsolutePath(), now));
-            db.mediaDao().insert(new RoomItemMedia("MOVE_OUT", room, item, moveOutFile.getAbsolutePath(), now + 1));
+            writeSeedImage(moveInFile, MODE_MOVE_IN);
+            writeSeedImage(moveOutFile, MODE_MOVE_OUT);
+            db.mediaDao().insert(new RoomItemMedia(MODE_MOVE_IN, room, item, moveInFile.getAbsolutePath(), now, seededPropertyId, insertedItem.id));
+            db.mediaDao().insert(new RoomItemMedia(MODE_MOVE_OUT, room, item, moveOutFile.getAbsolutePath(), now + 1, seededPropertyId, insertedItem.id));
 
-            List<RoomItemMedia> moveInForKey = db.mediaDao().getMoveInMedia(room, item);
-            List<RoomItemMedia> moveOutForKey = db.mediaDao().getMoveOutMedia(room, item);
+            List<RoomItemMedia> moveInForKey = db.mediaDao().getMediaForChecklistItem(MODE_MOVE_IN, seededPropertyId, insertedItem.id);
+            List<RoomItemMedia> moveOutForKey = db.mediaDao().getMediaForChecklistItem(MODE_MOVE_OUT, seededPropertyId, insertedItem.id);
             boolean moveInInserted = moveInForKey != null && !moveInForKey.isEmpty();
             boolean moveOutInserted = moveOutForKey != null && !moveOutForKey.isEmpty();
-            int moveInTotal = db.mediaDao().getAllMoveIn().size();
-            int moveOutTotal = db.mediaDao().getAllMoveOut().size();
+            int moveInTotal = db.mediaDao().getAllMoveInForProperty(seededPropertyId).size();
+            int moveOutTotal = db.mediaDao().getAllMoveOutForProperty(seededPropertyId).size();
 
             String debugText = "Seed result:\n"
                     + "MOVE_IN inserted: " + (moveInInserted ? "YES" : "NO") + "\n"
@@ -184,6 +213,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
             textSeedDebug.setText(debugText);
             textSeedDebug.setVisibility(View.VISIBLE);
 
+            propertyId = seededPropertyId;
             loadComparisonRows();
             Toast.makeText(this, "Demo pair added", Toast.LENGTH_SHORT).show();
         } catch (IOException exception) {
@@ -204,7 +234,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
         Bitmap bitmap = Bitmap.createBitmap(720, 480, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setColor("MOVE_IN".equals(mode) ? Color.parseColor("#D7F5D7") : Color.parseColor("#FDE7D7"));
+        paint.setColor(MODE_MOVE_IN.equals(mode) ? Color.parseColor("#D7F5D7") : Color.parseColor("#FDE7D7"));
         canvas.drawRect(0, 0, bitmap.getWidth(), bitmap.getHeight(), paint);
         paint.setColor(Color.parseColor("#1B1B1B"));
         paint.setTextSize(48f);
@@ -227,9 +257,5 @@ public class ComparisonReportActivity extends AppCompatActivity {
             return "";
         }
         return value.trim().toLowerCase(Locale.US);
-    }
-
-    private String normalizeKey(String value) {
-        return normalizeValue(value);
     }
 }

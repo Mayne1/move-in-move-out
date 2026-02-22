@@ -17,10 +17,40 @@
         android:id="@+id/textCaptureContext"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="8dp"
         android:background="#EDEDED"
         android:padding="12dp"
         android:text="No context provided." />
+
+    <TextView
+        android:id="@+id/textCaptureTip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="Tip: Take at least one clear photo for each item." />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/buttonPreviousItem"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="Previous Item" />
+
+        <Button
+            android:id="@+id/buttonNextItem"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:text="Next Item" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/buttonPhoto"
