@@ -5,18 +5,35 @@ import android.os.Bundle;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.mayneline.moveinmoveout.model.InspectionChecklistFactory;
+import com.mayneline.moveinmoveout.ui.InspectionChecklistAdapter;
 
 public class MoveOutWizardActivity extends AppCompatActivity {
+    private static final String MODE_MOVE_OUT = "MOVE_OUT";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_move_out_wizard);
 
-        findViewById(R.id.buttonStartCaptureMoveOut).setOnClickListener(v ->
-                startActivity(new Intent(this, CaptureActivity.class)));
+        RecyclerView recyclerChecklist = findViewById(R.id.recyclerChecklistMoveOut);
+        recyclerChecklist.setLayoutManager(new LinearLayoutManager(this));
+        recyclerChecklist.setAdapter(new InspectionChecklistAdapter(
+                InspectionChecklistFactory.createBaselineSections(),
+                this::openCaptureForItem));
 
         findViewById(R.id.buttonContinueMoveOut).setOnClickListener(v ->
                 Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show());
+    }
+
+    private void openCaptureForItem(String roomName, String itemName) {
+        Intent intent = new Intent(this, CaptureActivity.class);
+        intent.putExtra("mode", MODE_MOVE_OUT);
+        intent.putExtra("room", roomName);
+        intent.putExtra("item", itemName);
+        startActivity(intent);
     }
 }
