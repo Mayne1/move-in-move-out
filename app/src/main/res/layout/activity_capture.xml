@@ -26,8 +26,23 @@
         android:id="@+id/textCaptureTip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="8dp"
         android:text="Tip: Take at least one clear photo for each item." />
+
+    <TextView
+        android:id="@+id/textCompletion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:text="Completion: 0%" />
+
+    <EditText
+        android:id="@+id/editNote"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:hint="Optional note for this item"
+        android:inputType="textCapSentences|textMultiLine" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -63,5 +78,12 @@
         android:id="@+id/buttonVideo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
         android:text="Video" />
+
+    <Button
+        android:id="@+id/buttonFinalizeRun"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Finalize Run" />
 </LinearLayout>

@@ -10,158 +10,134 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.mayneline.moveinmoveout.data.AppDatabase;
-import com.mayneline.moveinmoveout.data.ChecklistItemEntity;
 import com.mayneline.moveinmoveout.data.PropertyEntity;
+import com.mayneline.moveinmoveout.engine.ChecklistEngineService;
+import com.mayneline.moveinmoveout.engine.RunService;
+import com.mayneline.moveinmoveout.model.InspectionMode;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.UUID;
 
 public class SetupActivity extends AppCompatActivity {
-    private static final String MODE_MOVE_IN = "MOVE_IN";
-    private static final String MODE_MOVE_OUT = "MOVE_OUT";
-
     private EditText editAddress;
+    private EditText editUnitNumber;
     private EditText editBedrooms;
     private EditText editBathrooms;
-    private CheckBox checkExterior;
+    private CheckBox checkGarage;
+    private CheckBox checkBasement;
+    private CheckBox checkYard;
     private TextView textSetupStatus;
-    private long currentPropertyId = -1L;
+
+    private String currentPropertyId;
+    private InspectionMode preferredMode = InspectionMode.MOVE_IN;
+
+    private AppDatabase db;
+    private ChecklistEngineService checklistEngine;
+    private RunService runService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setup);
 
+        db = AppDatabase.getInstance(this);
+        checklistEngine = new ChecklistEngineService();
+        runService = new RunService(db);
+
         editAddress = findViewById(R.id.editAddress);
+        editUnitNumber = findViewById(R.id.editUnitNumber);
         editBedrooms = findViewById(R.id.editBedrooms);
         editBathrooms = findViewById(R.id.editBathrooms);
-        checkExterior = findViewById(R.id.checkExteriorYard);
+        checkGarage = findViewById(R.id.checkGarage);
+        checkBasement = findViewById(R.id.checkBasement);
+        checkYard = findViewById(R.id.checkYard);
         textSetupStatus = findViewById(R.id.textSetupStatus);
 
-        findViewById(R.id.buttonGenerateChecklist).setOnClickListener(v -> generateChecklist());
-        findViewById(R.id.buttonStartMoveIn).setOnClickListener(v -> startCaptureFlow(MODE_MOVE_IN));
-        findViewById(R.id.buttonStartMoveOut).setOnClickListener(v -> startCaptureFlow(MODE_MOVE_OUT));
-
-        String preferredMode = getIntent().getStringExtra("mode");
-        if (MODE_MOVE_OUT.equals(preferredMode)) {
-            textSetupStatus.setText("Setup ready. Preferred mode: Move Out");
-        } else {
-            textSetupStatus.setText("Setup ready. Preferred mode: Move In");
+        String preferred = getIntent().getStringExtra("mode");
+        if (InspectionMode.MOVE_OUT.name().equals(preferred)) {
+            preferredMode = InspectionMode.MOVE_OUT;
         }
+
+        findViewById(R.id.buttonGenerateChecklist).setOnClickListener(v -> generatePropertyAndChecklist());
+        findViewById(R.id.buttonStartMoveIn).setOnClickListener(v -> startRun(InspectionMode.MOVE_IN, false));
+        findViewById(R.id.buttonStartMoveOut).setOnClickListener(v -> startRun(InspectionMode.MOVE_OUT, false));
+        findViewById(R.id.buttonStartNewRun).setOnClickListener(v -> startRun(preferredMode, true));
+
+        updateStatus("Setup ready. Preferred mode: " + preferredMode.name());
     }
 
-    private void generateChecklist() {
+    private void generatePropertyAndChecklist() {
         String address = safeText(editAddress.getText().toString());
         if (address.isEmpty()) {
             Toast.makeText(this, "Address is required", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        int bedrooms = parsePositiveInt(editBedrooms.getText().toString(), 1);
-        int bathrooms = parsePositiveInt(editBathrooms.getText().toString(), 1);
+        String propertyId = UUID.randomUUID().toString();
+        PropertyEntity property = new PropertyEntity(
+                propertyId,
+                address,
+                safeText(editUnitNumber.getText().toString()),
+                parsePositiveInt(editBedrooms.getText().toString(), 1),
+                parsePositiveInt(editBathrooms.getText().toString(), 1),
+                checkGarage.isChecked(),
+                checkBasement.isChecked(),
+                checkYard.isChecked(),
+                System.currentTimeMillis()
+        );
 
-        AppDatabase db = AppDatabase.getInstance(this);
-        long createdAt = System.currentTimeMillis();
-        PropertyEntity property = new PropertyEntity(address, bedrooms, bathrooms, createdAt);
-        long propertyId = db.mediaDao().insertProperty(property);
+        db.mediaDao().insertProperty(property);
+        db.mediaDao().deleteChecklistStructureForProperty(property.propertyId);
+        db.mediaDao().insertChecklistStructure(checklistEngine.generateStructure(property));
 
-        List<String> rooms = buildRooms(bedrooms, bathrooms, checkExterior.isChecked());
-        List<ChecklistItemEntity> checklistItems = buildChecklistItems(propertyId, rooms);
-        db.mediaDao().insertChecklistItems(checklistItems);
-
-        currentPropertyId = propertyId;
-        textSetupStatus.setText("Checklist generated for property #" + propertyId + " (" + checklistItems.size() + " items)");
+        currentPropertyId = property.propertyId;
+        updateStatus("Property created. Checklist generated: " + db.mediaDao().countChecklistStructureForProperty(property.propertyId) + " items.");
         Toast.makeText(this, "Checklist generated", Toast.LENGTH_SHORT).show();
     }
 
-    private void startCaptureFlow(String mode) {
-        AppDatabase db = AppDatabase.getInstance(this);
-        long propertyId = resolvePropertyId(db);
-        if (propertyId <= 0) {
+    private void startRun(InspectionMode mode, boolean forceNew) {
+        String propertyId = resolvePropertyId();
+        if (propertyId == null) {
             Toast.makeText(this, "Generate checklist first", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        List<ChecklistItemEntity> items = db.mediaDao().getChecklistItemsForProperty(propertyId);
-        if (items == null || items.isEmpty()) {
-            Toast.makeText(this, "Checklist is empty", Toast.LENGTH_SHORT).show();
+        int structureCount = db.mediaDao().countChecklistStructureForProperty(propertyId);
+        if (structureCount == 0) {
+            Toast.makeText(this, "Checklist not found for property", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Intent intent = new Intent(this, CaptureActivity.class);
-        intent.putExtra("mode", mode);
-        intent.putExtra("propertyId", propertyId);
-        intent.putExtra("checklistItemId", items.get(0).id);
-        startActivity(intent);
+        try {
+            String runId;
+            String runLabel;
+            if (forceNew) {
+                runId = runService.startNewRun(propertyId, mode).runId;
+                runLabel = runService.requireEditableRun(runId).runLabel;
+            } else {
+                runId = runService.getOrCreateActiveRun(propertyId, mode).runId;
+                runLabel = runService.requireEditableRun(runId).runLabel;
+            }
+
+            Intent intent = new Intent(this, CaptureActivity.class);
+            intent.putExtra("propertyId", propertyId);
+            intent.putExtra("runId", runId);
+            intent.putExtra("mode", mode.name());
+            startActivity(intent);
+            updateStatus("Started " + mode.name() + " run " + runLabel + ".");
+        } catch (Exception exception) {
+            Toast.makeText(this, exception.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
-    private long resolvePropertyId(AppDatabase db) {
-        if (currentPropertyId > 0) {
+    private String resolvePropertyId() {
+        if (currentPropertyId != null && !currentPropertyId.isEmpty()) {
             return currentPropertyId;
         }
-
         PropertyEntity latest = db.mediaDao().getLatestProperty();
         if (latest != null) {
-            currentPropertyId = latest.id;
-            return latest.id;
+            currentPropertyId = latest.propertyId;
         }
-
-        return -1L;
-    }
-
-    private List<String> buildRooms(int bedrooms, int bathrooms, boolean includeExterior) {
-        List<String> rooms = new ArrayList<>();
-        rooms.add("Entry Hall");
-        rooms.add("Living Room");
-        rooms.add("Kitchen");
-        rooms.add("Hallway");
-
-        for (int i = 1; i <= bedrooms; i++) {
-            rooms.add("Bedroom " + i);
-        }
-
-        for (int i = 1; i <= bathrooms; i++) {
-            rooms.add("Bathroom " + i);
-        }
-
-        if (includeExterior) {
-            rooms.add("Exterior / Yard");
-        }
-        return rooms;
-    }
-
-    private List<ChecklistItemEntity> buildChecklistItems(long propertyId, List<String> rooms) {
-        List<ChecklistItemEntity> items = new ArrayList<>();
-        List<String> baseItems = Arrays.asList(
-                "Walls",
-                "Floor",
-                "Ceiling",
-                "Windows",
-                "Doors",
-                "Lights/Fixtures"
-        );
-        List<String> kitchenExtras = Arrays.asList(
-                "Sink",
-                "Countertops",
-                "Cabinets",
-                "Stove/Oven",
-                "Fridge"
-        );
-
-        int order = 0;
-        for (String room : rooms) {
-            for (String itemName : baseItems) {
-                items.add(new ChecklistItemEntity(propertyId, room, itemName, order++));
-            }
-
-            if ("Kitchen".equals(room)) {
-                for (String itemName : kitchenExtras) {
-                    items.add(new ChecklistItemEntity(propertyId, room, itemName, order++));
-                }
-            }
-        }
-        return items;
+        return currentPropertyId;
     }
 
     private int parsePositiveInt(String raw, int fallback) {
@@ -175,5 +151,9 @@ public class SetupActivity extends AppCompatActivity {
 
     private String safeText(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private void updateStatus(String text) {
+        textSetupStatus.setText(text);
     }
 }

@@ -26,6 +26,14 @@
             android:inputType="textPostalAddress" />
 
         <EditText
+            android:id="@+id/editUnitNumber"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="Unit Number (Optional)"
+            android:inputType="text" />
+
+        <EditText
             android:id="@+id/editBedrooms"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -44,12 +52,26 @@
             android:text="1" />
 
         <CheckBox
-            android:id="@+id/checkExteriorYard"
+            android:id="@+id/checkGarage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Has Garage" />
+
+        <CheckBox
+            android:id="@+id/checkBasement"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Has Basement" />
+
+        <CheckBox
+            android:id="@+id/checkYard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
             android:checked="true"
-            android:text="Include Exterior / Yard" />
+            android:text="Has Yard" />
 
         <Button
             android:id="@+id/buttonGenerateChecklist"
@@ -69,7 +91,14 @@
             android:id="@+id/buttonStartMoveOut"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
             android:text="Start Move Out" />
+
+        <Button
+            android:id="@+id/buttonStartNewRun"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start New Run" />
 
         <TextView
             android:id="@+id/textSetupStatus"

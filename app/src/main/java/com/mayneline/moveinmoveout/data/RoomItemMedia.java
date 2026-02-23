@@ -1,9 +1,7 @@
 package com.mayneline.moveinmoveout.data;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.room.Entity;
-import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 @Entity(tableName = "room_item_media")
@@ -12,45 +10,53 @@ public class RoomItemMedia {
     public long id;
 
     @NonNull
+    public String propertyId;
+
+    @NonNull
+    public String runId;
+
+    @NonNull
     public String mode;
 
     @NonNull
-    public String room;
+    public String runLabel;
 
     @NonNull
-    public String item;
+    public String roomId;
 
     @NonNull
-    public String filePath;
+    public String itemId;
 
+    @NonNull
+    public String mediaPath;
+
+    public String note;
     public long timestamp;
 
-    @Nullable
-    public Long propertyId;
-
-    @Nullable
-    public Long checklistItemId;
-
-    @Ignore
-    public RoomItemMedia(@NonNull String mode, @NonNull String room, @NonNull String item, @NonNull String filePath, long timestamp) {
-        this(mode, room, item, filePath, timestamp, null, null);
-    }
+    @NonNull
+    public String mediaSha256;
 
     public RoomItemMedia(
+            @NonNull String propertyId,
+            @NonNull String runId,
             @NonNull String mode,
-            @NonNull String room,
-            @NonNull String item,
-            @NonNull String filePath,
+            @NonNull String runLabel,
+            @NonNull String roomId,
+            @NonNull String itemId,
+            @NonNull String mediaPath,
+            String note,
             long timestamp,
-            @Nullable Long propertyId,
-            @Nullable Long checklistItemId
+            @NonNull String mediaSha256
     ) {
-        this.mode = mode;
-        this.room = room;
-        this.item = item;
-        this.filePath = filePath;
-        this.timestamp = timestamp;
         this.propertyId = propertyId;
-        this.checklistItemId = checklistItemId;
+        this.runId = runId;
+        this.mode = mode;
+        this.runLabel = runLabel;
+        this.roomId = roomId;
+        this.itemId = itemId;
+        this.mediaPath = mediaPath;
+        this.note = note;
+        this.timestamp = timestamp;
+        this.mediaSha256 = mediaSha256;
     }
 }

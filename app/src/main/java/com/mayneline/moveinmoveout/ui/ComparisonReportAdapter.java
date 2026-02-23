@@ -89,10 +89,10 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
         }
 
         private int statusColor(String status) {
-            if ("No Change".equals(status)) {
+            if ("No Change".equals(status) || "NO_CHANGE".equals(status)) {
                 return Color.parseColor("#1B5E20");
             }
-            if ("Media Missing".equals(status)) {
+            if ("Media Missing".equals(status) || "MISSING".equals(status)) {
                 return Color.parseColor("#B71C1C");
             }
             return Color.parseColor("#E65100");

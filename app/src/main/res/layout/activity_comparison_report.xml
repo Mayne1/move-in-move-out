@@ -13,18 +13,6 @@
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/textSeedDebug"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="6dp"
-        android:background="#EDEDED"
-        android:padding="8dp"
-        android:text=""
-        android:textSize="12sp"
-        android:visibility="gone" />
-
-    <TextView
         android:id="@+id/textSummary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -34,11 +22,11 @@
         android:textSize="14sp" />
 
     <Button
-        android:id="@+id/buttonSeedDemo"
+        android:id="@+id/buttonGeneratePdf"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="Seed Demo Pair" />
+        android:text="Generate PDF" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerComparison"

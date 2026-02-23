@@ -7,33 +7,34 @@ import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 @Entity(
-        tableName = "checklist_items",
+        tableName = "checklist_structure",
         foreignKeys = @ForeignKey(
                 entity = PropertyEntity.class,
-                parentColumns = "id",
+                parentColumns = "propertyId",
                 childColumns = "propertyId",
                 onDelete = ForeignKey.CASCADE
         ),
         indices = {@Index("propertyId")}
 )
-public class ChecklistItemEntity {
+public class ChecklistStructureEntity {
     @PrimaryKey(autoGenerate = true)
     public long id;
 
-    public long propertyId;
+    @NonNull
+    public String propertyId;
 
     @NonNull
-    public String roomName;
+    public String roomId;
 
     @NonNull
-    public String itemName;
+    public String itemId;
 
     public int sortOrder;
 
-    public ChecklistItemEntity(long propertyId, @NonNull String roomName, @NonNull String itemName, int sortOrder) {
+    public ChecklistStructureEntity(@NonNull String propertyId, @NonNull String roomId, @NonNull String itemId, int sortOrder) {
         this.propertyId = propertyId;
-        this.roomName = roomName;
-        this.itemName = itemName;
+        this.roomId = roomId;
+        this.itemId = itemId;
         this.sortOrder = sortOrder;
     }
 }
