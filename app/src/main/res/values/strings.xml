@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">MoveinMoveout</string>
+    <string name="wizard_default_mode">MOVE_IN</string>
+    <string name="wizard_meta">Property #%1$d | Mode: %2$s</string>
+    <string name="wizard_complete">Complete</string>
+    <string name="wizard_all_items_processed">All checklist items processed</string>
+    <string name="wizard_ready_report">You can now generate the comparison report.</string>
+    <string name="wizard_progress">Room %1$d/%2$d | Item %3$d/%4$d</string>
+    <string name="toast_photo_capture_failed">Photo capture failed</string>
+    <string name="toast_photo_saved">Photo saved</string>
+    <string name="toast_photo_save_failed">Failed to save photo</string>
+    <string name="toast_video_capture_failed">Video capture failed</string>
+    <string name="toast_video_saved">Video saved</string>
+    <string name="toast_video_save_failed">Failed to save video</string>
 </resources>

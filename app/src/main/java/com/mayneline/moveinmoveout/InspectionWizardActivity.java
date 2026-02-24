@@ -51,7 +51,7 @@ public class InspectionWizardActivity extends AppCompatActivity {
         propertyId = getIntent().getLongExtra("propertyId", -1L);
         mode = getIntent().getStringExtra("mode");
         if (mode == null || mode.trim().isEmpty()) {
-            mode = "MOVE_IN";
+            mode = getString(R.string.wizard_default_mode);
         }
 
         textWizardMeta = findViewById(R.id.textWizardMeta);
@@ -65,7 +65,7 @@ public class InspectionWizardActivity extends AppCompatActivity {
                 if (data instanceof Bitmap) {
                     savePhoto((Bitmap) data);
                 } else {
-                    Toast.makeText(this, "Photo capture failed", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, getString(R.string.toast_photo_capture_failed), Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -103,20 +103,26 @@ public class InspectionWizardActivity extends AppCompatActivity {
     }
 
     private void refreshUi() {
-        textWizardMeta.setText("Property #" + propertyId + " | Mode: " + mode);
+        textWizardMeta.setText(getString(R.string.wizard_meta, propertyId, mode));
 
         boolean complete = steps.isEmpty() || currentIndex >= steps.size();
         findViewById(R.id.buttonGenerateReport).setVisibility(complete ? View.VISIBLE : View.GONE);
 
         if (complete) {
-            textWizardProgress.setText("Complete");
-            textCurrentRoom.setText("All checklist items processed");
-            textCurrentItem.setText("You can now generate the comparison report.");
+            textWizardProgress.setText(getString(R.string.wizard_complete));
+            textCurrentRoom.setText(getString(R.string.wizard_all_items_processed));
+            textCurrentItem.setText(getString(R.string.wizard_ready_report));
             return;
         }
 
         Step step = steps.get(currentIndex);
-        textWizardProgress.setText("Room " + step.roomPosition + "/" + step.roomTotal + " | Item " + step.itemPosition + "/" + step.itemTotal);
+        textWizardProgress.setText(getString(
+                R.string.wizard_progress,
+                step.roomPosition,
+                step.roomTotal,
+                step.itemPosition,
+                step.itemTotal
+        ));
         textCurrentRoom.setText(step.room.name);
         textCurrentItem.setText(step.item.name);
     }
@@ -148,10 +154,10 @@ public class InspectionWizardActivity extends AppCompatActivity {
         try (FileOutputStream fos = new FileOutputStream(outFile)) {
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
             insertMedia(step, outFile.getAbsolutePath(), ts);
-            Toast.makeText(this, "Photo saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_photo_saved), Toast.LENGTH_SHORT).show();
             advance();
         } catch (Exception exception) {
-            Toast.makeText(this, "Failed to save photo", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_photo_save_failed), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -164,9 +170,9 @@ public class InspectionWizardActivity extends AppCompatActivity {
         long ts = System.currentTimeMillis();
         File outFile = buildCaptureFile(step, ts, "mp4");
         try (InputStream inputStream = getContentResolver().openInputStream(uri);
-             FileOutputStream outputStream = new FileOutputStream(outFile)) {
+            FileOutputStream outputStream = new FileOutputStream(outFile)) {
             if (inputStream == null) {
-                Toast.makeText(this, "Video capture failed", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.toast_video_capture_failed), Toast.LENGTH_SHORT).show();
                 return;
             }
             byte[] buffer = new byte[8192];
@@ -175,10 +181,10 @@ public class InspectionWizardActivity extends AppCompatActivity {
                 outputStream.write(buffer, 0, read);
             }
             insertMedia(step, outFile.getAbsolutePath(), ts);
-            Toast.makeText(this, "Video saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_video_saved), Toast.LENGTH_SHORT).show();
             advance();
         } catch (Exception exception) {
-            Toast.makeText(this, "Failed to save video", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_video_save_failed), Toast.LENGTH_SHORT).show();
         }
     }
 
