@@ -1,11 +1,14 @@
 package com.mayneline.moveinmoveout;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.InputType;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,11 +28,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class InspectionWizardActivity extends AppCompatActivity {
+    private static final String MEDIA_PHOTO = "PHOTO";
+    private static final String MEDIA_VIDEO = "VIDEO";
+
+    private static final String TAG_WALKTHROUGH = "WALKTHROUGH";
+    private static final String TAG_DETAIL = "DETAIL";
+    private static final String TAG_REPAIR = "REPAIR";
+
     private final List<Step> steps = new ArrayList<>();
     private int currentIndex = 0;
 
     private long propertyId;
     private String mode;
+
+    private String pendingMediaType = MEDIA_PHOTO;
+    private String pendingTag = TAG_WALKTHROUGH;
 
     private AppDatabase db;
 
@@ -37,6 +50,9 @@ public class InspectionWizardActivity extends AppCompatActivity {
     private TextView textWizardProgress;
     private TextView textCurrentRoom;
     private TextView textCurrentItem;
+    private View panelAppendEvidence;
+    private View buttonNext;
+    private View buttonSkip;
 
     private ActivityResultLauncher<Intent> photoLauncher;
     private ActivityResultLauncher<Intent> videoLauncher;
@@ -58,6 +74,9 @@ public class InspectionWizardActivity extends AppCompatActivity {
         textWizardProgress = findViewById(R.id.textWizardProgress);
         textCurrentRoom = findViewById(R.id.textCurrentRoom);
         textCurrentItem = findViewById(R.id.textCurrentItem);
+        panelAppendEvidence = findViewById(R.id.panelAppendEvidence);
+        buttonNext = findViewById(R.id.buttonNext);
+        buttonSkip = findViewById(R.id.buttonSkip);
 
         photoLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
@@ -76,10 +95,30 @@ public class InspectionWizardActivity extends AppCompatActivity {
             }
         });
 
-        findViewById(R.id.buttonTakePhoto).setOnClickListener(v -> launchPhoto());
-        findViewById(R.id.buttonTakeVideo).setOnClickListener(v -> launchVideo());
-        findViewById(R.id.buttonSkip).setOnClickListener(v -> advance());
-        findViewById(R.id.buttonNext).setOnClickListener(v -> advance());
+        findViewById(R.id.buttonTakePhoto).setOnClickListener(v -> {
+            pendingMediaType = MEDIA_PHOTO;
+            pendingTag = TAG_WALKTHROUGH;
+            launchPhoto();
+        });
+        findViewById(R.id.buttonTakeVideo).setOnClickListener(v -> {
+            pendingMediaType = MEDIA_VIDEO;
+            pendingTag = TAG_WALKTHROUGH;
+            launchVideo();
+        });
+        findViewById(R.id.buttonAddDetailPhoto).setOnClickListener(v -> {
+            pendingMediaType = MEDIA_PHOTO;
+            pendingTag = TAG_DETAIL;
+            launchPhoto();
+        });
+        findViewById(R.id.buttonAddRepairPhoto).setOnClickListener(v -> {
+            pendingMediaType = MEDIA_PHOTO;
+            pendingTag = TAG_REPAIR;
+            launchPhoto();
+        });
+        findViewById(R.id.buttonAddNote).setOnClickListener(v -> showAddNoteDialog());
+
+        buttonSkip.setOnClickListener(v -> advance());
+        buttonNext.setOnClickListener(v -> advance());
         findViewById(R.id.buttonGenerateReport).setOnClickListener(v -> openReport());
 
         loadSteps();
@@ -109,6 +148,9 @@ public class InspectionWizardActivity extends AppCompatActivity {
         findViewById(R.id.buttonGenerateReport).setVisibility(complete ? View.VISIBLE : View.GONE);
 
         if (complete) {
+            panelAppendEvidence.setVisibility(View.GONE);
+            buttonNext.setEnabled(false);
+            buttonSkip.setEnabled(false);
             textWizardProgress.setText(getString(R.string.wizard_complete));
             textCurrentRoom.setText(getString(R.string.wizard_all_items_processed));
             textCurrentItem.setText(getString(R.string.wizard_ready_report));
@@ -116,6 +158,11 @@ public class InspectionWizardActivity extends AppCompatActivity {
         }
 
         Step step = steps.get(currentIndex);
+        boolean hasRequiredEvidence = hasWalkthroughEvidence(step);
+        panelAppendEvidence.setVisibility(hasRequiredEvidence ? View.VISIBLE : View.GONE);
+        buttonNext.setEnabled(hasRequiredEvidence);
+        buttonSkip.setEnabled(hasRequiredEvidence);
+
         textWizardProgress.setText(getString(
                 R.string.wizard_progress,
                 step.roomPosition,
@@ -125,6 +172,16 @@ public class InspectionWizardActivity extends AppCompatActivity {
         ));
         textCurrentRoom.setText(step.room.name);
         textCurrentItem.setText(step.item.name);
+    }
+
+    private boolean hasWalkthroughEvidence(Step step) {
+        List<RoomItemMedia> timeline = db.mediaDao().getAllMediaForRoomItemMode(propertyId, step.item.id, mode);
+        for (RoomItemMedia media : timeline) {
+            if (TAG_WALKTHROUGH.equals(media.tag) && bestPath(media).length() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void launchPhoto() {
@@ -153,9 +210,9 @@ public class InspectionWizardActivity extends AppCompatActivity {
         File outFile = buildCaptureFile(step, ts, "jpg");
         try (FileOutputStream fos = new FileOutputStream(outFile)) {
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
-            insertMedia(step, outFile.getAbsolutePath(), ts);
+            insertMedia(step, outFile.getAbsolutePath(), ts, MEDIA_PHOTO, pendingTag, null, 0L);
             Toast.makeText(this, getString(R.string.toast_photo_saved), Toast.LENGTH_SHORT).show();
-            advance();
+            refreshUi();
         } catch (Exception exception) {
             Toast.makeText(this, getString(R.string.toast_photo_save_failed), Toast.LENGTH_SHORT).show();
         }
@@ -170,7 +227,7 @@ public class InspectionWizardActivity extends AppCompatActivity {
         long ts = System.currentTimeMillis();
         File outFile = buildCaptureFile(step, ts, "mp4");
         try (InputStream inputStream = getContentResolver().openInputStream(uri);
-            FileOutputStream outputStream = new FileOutputStream(outFile)) {
+             FileOutputStream outputStream = new FileOutputStream(outFile)) {
             if (inputStream == null) {
                 Toast.makeText(this, getString(R.string.toast_video_capture_failed), Toast.LENGTH_SHORT).show();
                 return;
@@ -180,16 +237,63 @@ public class InspectionWizardActivity extends AppCompatActivity {
             while ((read = inputStream.read(buffer)) != -1) {
                 outputStream.write(buffer, 0, read);
             }
-            insertMedia(step, outFile.getAbsolutePath(), ts);
+            insertMedia(step, outFile.getAbsolutePath(), ts, MEDIA_VIDEO, pendingTag, null, 0L);
             Toast.makeText(this, getString(R.string.toast_video_saved), Toast.LENGTH_SHORT).show();
-            advance();
+            refreshUi();
         } catch (Exception exception) {
             Toast.makeText(this, getString(R.string.toast_video_save_failed), Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void insertMedia(Step step, String filePath, long ts) {
-        RoomItemMedia media = new RoomItemMedia(mode, step.room.name, step.item.name, filePath, ts);
+    private void showAddNoteDialog() {
+        Step step = currentStep();
+        if (step == null) {
+            return;
+        }
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setHint(getString(R.string.wizard_note_hint));
+
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.wizard_add_note))
+                .setView(input)
+                .setPositiveButton(getString(android.R.string.ok), (dialog, which) -> {
+                    String note = input.getText() == null ? "" : input.getText().toString().trim();
+                    if (note.isEmpty()) {
+                        return;
+                    }
+                    saveNoteForCurrentStep(step, note);
+                })
+                .setNegativeButton(getString(android.R.string.cancel), null)
+                .show();
+    }
+
+    private void saveNoteForCurrentStep(Step step, String note) {
+        RoomItemMedia latest = db.mediaDao().getLatestMediaForRoomItemMode(propertyId, step.item.id, mode);
+        if (latest != null) {
+            latest.note = note;
+            db.mediaDao().updateMedia(latest);
+            Toast.makeText(this, getString(R.string.wizard_note_saved), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        long ts = System.currentTimeMillis();
+        insertMedia(step, "", ts, MEDIA_PHOTO, TAG_DETAIL, note, 0L);
+        Toast.makeText(this, getString(R.string.wizard_note_saved), Toast.LENGTH_SHORT).show();
+        refreshUi();
+    }
+
+    private void insertMedia(
+            Step step,
+            String filePath,
+            long ts,
+            String mediaType,
+            String tag,
+            String note,
+            long videoTimestampMs
+    ) {
+        RoomItemMedia media = new RoomItemMedia(mode, step.room.name, step.item.name, filePath, ts, mediaType, tag, note, videoTimestampMs);
         media.applyPropertyLinks(propertyId, step.room.id, step.item.id);
         media.propertyId = String.valueOf(propertyId);
         media.roomId = step.room.name;
@@ -210,6 +314,16 @@ public class InspectionWizardActivity extends AppCompatActivity {
     }
 
     private void advance() {
+        Step step = currentStep();
+        if (step == null) {
+            return;
+        }
+
+        if (!hasWalkthroughEvidence(step)) {
+            Toast.makeText(this, getString(R.string.wizard_capture_required), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         if (!isComplete()) {
             currentIndex++;
         }
@@ -231,6 +345,16 @@ public class InspectionWizardActivity extends AppCompatActivity {
             return null;
         }
         return steps.get(currentIndex);
+    }
+
+    private String bestPath(RoomItemMedia media) {
+        if (media == null) {
+            return "";
+        }
+        if (media.filePath != null && !media.filePath.isEmpty()) {
+            return media.filePath;
+        }
+        return media.mediaPath == null ? "" : media.mediaPath;
     }
 
     private static class Step {

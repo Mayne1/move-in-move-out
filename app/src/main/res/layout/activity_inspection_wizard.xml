@@ -57,6 +57,43 @@
         android:layout_marginBottom="10dp"
         android:text="Take Video" />
 
+    <LinearLayout
+        android:id="@+id/panelAppendEvidence"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/textAppendTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Append Evidence"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/buttonAddDetailPhoto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Add Detail Photo" />
+
+        <Button
+            android:id="@+id/buttonAddNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Add Note" />
+
+        <Button
+            android:id="@+id/buttonAddRepairPhoto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add Repair Photo" />
+    </LinearLayout>
+
     <Button
         android:id="@+id/buttonSkip"
         android:layout_width="match_parent"

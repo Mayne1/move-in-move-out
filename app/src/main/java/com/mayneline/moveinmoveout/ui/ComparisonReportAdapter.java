@@ -48,6 +48,8 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
         private final TextView textItem;
         private final ImageView imageMoveIn;
         private final ImageView imageMoveOut;
+        private final TextView textMoveInMediaType;
+        private final TextView textMoveOutMediaType;
         private final TextView textStatus;
 
         ComparisonViewHolder(@NonNull View itemView) {
@@ -56,19 +58,24 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             textItem = itemView.findViewById(R.id.textItem);
             imageMoveIn = itemView.findViewById(R.id.imageMoveIn);
             imageMoveOut = itemView.findViewById(R.id.imageMoveOut);
+            textMoveInMediaType = itemView.findViewById(R.id.textMoveInMediaType);
+            textMoveOutMediaType = itemView.findViewById(R.id.textMoveOutMediaType);
             textStatus = itemView.findViewById(R.id.textStatus);
         }
 
         void bind(ComparisonRow row) {
             textRoom.setText("Room: " + row.getRoom());
             textItem.setText("Item: " + row.getItem());
-            bindImage(imageMoveIn, row.getMoveInPath());
-            bindImage(imageMoveOut, row.getMoveOutPath());
+            bindImage(imageMoveIn, textMoveInMediaType, row.getMoveInPath(), row.getMoveInMediaType());
+            bindImage(imageMoveOut, textMoveOutMediaType, row.getMoveOutPath(), row.getMoveOutMediaType());
             textStatus.setText("Status: " + row.getStatus());
             textStatus.setTextColor(statusColor(row.getStatus()));
         }
 
-        private void bindImage(ImageView imageView, String path) {
+        private void bindImage(ImageView imageView, TextView mediaTypeView, String path, String mediaType) {
+            String normalizedType = mediaType == null ? "PHOTO" : mediaType.toUpperCase();
+            mediaTypeView.setText(normalizedType);
+
             if (TextUtils.isEmpty(path)) {
                 imageView.setImageResource(android.R.drawable.ic_menu_report_image);
                 return;
@@ -77,6 +84,11 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             File file = new File(path);
             if (!file.exists()) {
                 imageView.setImageResource(android.R.drawable.ic_menu_report_image);
+                return;
+            }
+
+            if ("VIDEO".equals(normalizedType)) {
+                imageView.setImageResource(android.R.drawable.ic_media_play);
                 return;
             }
 

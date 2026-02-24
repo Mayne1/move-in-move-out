@@ -12,4 +12,8 @@
     <string name="toast_video_capture_failed">Video capture failed</string>
     <string name="toast_video_saved">Video saved</string>
     <string name="toast_video_save_failed">Failed to save video</string>
+    <string name="wizard_note_hint">Enter note</string>
+    <string name="wizard_add_note">Add Note</string>
+    <string name="wizard_note_saved">Note saved</string>
+    <string name="wizard_capture_required">Capture a walkthrough photo or video before continuing.</string>
 </resources>

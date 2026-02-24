@@ -23,6 +23,11 @@ public class RoomItemMedia {
     public String filePath;
 
     public long timestamp;
+    @NonNull
+    public String mediaType;
+    @NonNull
+    public String tag;
+    public long videoTimestampMs;
 
     public Long propertyProfileId;
     public Long propertyRoomId;
@@ -40,10 +45,14 @@ public class RoomItemMedia {
     public String mediaSha256;
 
     public RoomItemMedia() {
+        this.mediaType = "PHOTO";
+        this.tag = "WALKTHROUGH";
+        this.videoTimestampMs = 0L;
     }
 
     @Ignore
     public RoomItemMedia(@NonNull String mode, @NonNull String room, @NonNull String item, @NonNull String filePath, long timestamp) {
+        this();
         this.mode = mode;
         this.room = room;
         this.item = item;
@@ -73,6 +82,25 @@ public class RoomItemMedia {
         this.runLabel = runLabel;
         this.note = note;
         this.mediaSha256 = mediaSha256;
+    }
+
+    @Ignore
+    public RoomItemMedia(
+            @NonNull String mode,
+            @NonNull String room,
+            @NonNull String item,
+            @NonNull String filePath,
+            long timestamp,
+            @NonNull String mediaType,
+            @NonNull String tag,
+            String note,
+            long videoTimestampMs
+    ) {
+        this(mode, room, item, filePath, timestamp);
+        this.mediaType = mediaType;
+        this.tag = tag;
+        this.note = note;
+        this.videoTimestampMs = videoTimestampMs;
     }
 
     public void applyPropertyLinks(Long propertyProfileId, Long propertyRoomId, Long roomItemId) {

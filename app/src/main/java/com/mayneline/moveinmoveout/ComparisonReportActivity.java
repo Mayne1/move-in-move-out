@@ -18,7 +18,6 @@ import com.mayneline.moveinmoveout.data.PropertyProfile;
 import com.mayneline.moveinmoveout.data.PropertyRoom;
 import com.mayneline.moveinmoveout.data.RoomItem;
 import com.mayneline.moveinmoveout.data.RoomItemMedia;
-import com.mayneline.moveinmoveout.engine.HashUtils;
 import com.mayneline.moveinmoveout.model.ComparisonRow;
 import com.mayneline.moveinmoveout.ui.ComparisonReportAdapter;
 
@@ -28,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ComparisonReportActivity extends AppCompatActivity {
+    private static final String MODE_MOVE_IN = "MOVE_IN";
+    private static final String MODE_MOVE_OUT = "MOVE_OUT";
+
     private RecyclerView recyclerComparison;
     private TextView textEmpty;
     private TextView textSummary;
@@ -73,14 +75,14 @@ public class ComparisonReportActivity extends AppCompatActivity {
         for (PropertyRoom room : rooms) {
             List<RoomItem> items = db.roomItemDao().getItemsForRoom(room.id);
             for (RoomItem item : items) {
-                RoomItemMedia moveIn = resolveMedia(property.id, room, item, "MOVE_IN");
-                RoomItemMedia moveOut = resolveMedia(property.id, room, item, "MOVE_OUT");
+                RoomItemMedia moveIn = resolvePrimaryMedia(property.id, room, item, MODE_MOVE_IN);
+                RoomItemMedia moveOut = resolvePrimaryMedia(property.id, room, item, MODE_MOVE_OUT);
 
                 String status;
                 if (moveIn == null || moveOut == null) {
                     status = "Media Missing";
                     missingCount++;
-                } else if (isNoChange(moveIn, moveOut)) {
+                } else if (bestPath(moveIn).equals(bestPath(moveOut))) {
                     status = "No Change";
                     noChangeCount++;
                 } else {
@@ -93,6 +95,8 @@ public class ComparisonReportActivity extends AppCompatActivity {
                         item.name,
                         moveIn == null ? "" : bestPath(moveIn),
                         moveOut == null ? "" : bestPath(moveOut),
+                        moveIn == null ? "PHOTO" : normalizeMediaType(moveIn.mediaType),
+                        moveOut == null ? "PHOTO" : normalizeMediaType(moveOut.mediaType),
                         status
                 ));
             }
@@ -112,39 +116,16 @@ public class ComparisonReportActivity extends AppCompatActivity {
         textEmpty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
-    private RoomItemMedia resolveMedia(long propertyId, PropertyRoom room, RoomItem item, String mode) {
-        RoomItemMedia media = db.mediaDao().getLatestForPropertyRoomItemMode(propertyId, room.id, item.id, mode);
+    private RoomItemMedia resolvePrimaryMedia(long propertyId, PropertyRoom room, RoomItem item, String mode) {
+        RoomItemMedia media = db.mediaDao().getPrimaryMediaForRoomItemMode(propertyId, item.id, mode);
         if (media != null) {
             return media;
         }
-        media = db.mediaDao().getLatestForRoomItemTextMode(propertyId, mode, room.name, item.name);
+        media = db.mediaDao().getPrimaryForRoomItemTextMode(propertyId, mode, room.name, item.name);
         if (media != null) {
             return media;
         }
-        return db.mediaDao().getLatestForRoomItemTextModeFallback(propertyId, String.valueOf(propertyId), mode, room.name, item.name);
-    }
-
-    private boolean isNoChange(RoomItemMedia moveIn, RoomItemMedia moveOut) {
-        String moveInPath = bestPath(moveIn);
-        String moveOutPath = bestPath(moveOut);
-
-        File moveInFile = new File(moveInPath);
-        File moveOutFile = new File(moveOutPath);
-        if (!moveInFile.exists() || !moveOutFile.exists()) {
-            return false;
-        }
-
-        if (moveInFile.length() != moveOutFile.length()) {
-            return false;
-        }
-
-        String hashA = HashUtils.sha256File(moveInPath);
-        String hashB = HashUtils.sha256File(moveOutPath);
-        if (!hashA.isEmpty() && hashA.equals(hashB)) {
-            return true;
-        }
-
-        return moveIn.timestamp == moveOut.timestamp;
+        return db.mediaDao().getPrimaryForRoomItemTextModeFallback(propertyId, String.valueOf(propertyId), mode, room.name, item.name);
     }
 
     private String bestPath(RoomItemMedia media) {
@@ -155,6 +136,13 @@ public class ComparisonReportActivity extends AppCompatActivity {
             return media.filePath;
         }
         return media.mediaPath == null ? "" : media.mediaPath;
+    }
+
+    private String normalizeMediaType(String mediaType) {
+        if (mediaType == null || mediaType.trim().isEmpty()) {
+            return "PHOTO";
+        }
+        return mediaType.toUpperCase();
     }
 
     private void seedDemoPair() {
@@ -179,22 +167,22 @@ public class ComparisonReportActivity extends AppCompatActivity {
         RoomItem item = items.get(0);
         long now = System.currentTimeMillis();
 
-        File moveInFile = createDemoImageFile(property.id, "MOVE_IN", room.id, item.id, now, "Move In");
-        File moveOutFile = createDemoImageFile(property.id, "MOVE_OUT", room.id, item.id, now + 1, "Move Out");
+        File moveInFile = createDemoImageFile(property.id, MODE_MOVE_IN, room.id, item.id, now, "Move In");
+        File moveOutFile = createDemoImageFile(property.id, MODE_MOVE_OUT, room.id, item.id, now + 1, "Move Out");
 
         if (moveInFile == null || moveOutFile == null) {
             Toast.makeText(this, "Failed to seed demo files", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        RoomItemMedia moveIn = new RoomItemMedia("MOVE_IN", room.name, item.name, moveInFile.getAbsolutePath(), now);
+        RoomItemMedia moveIn = new RoomItemMedia(MODE_MOVE_IN, room.name, item.name, moveInFile.getAbsolutePath(), now, "PHOTO", "WALKTHROUGH", null, 0L);
         moveIn.applyPropertyLinks(property.id, room.id, item.id);
         moveIn.propertyId = String.valueOf(property.id);
         moveIn.roomId = room.name;
         moveIn.itemId = item.name;
         moveIn.mediaPath = moveInFile.getAbsolutePath();
 
-        RoomItemMedia moveOut = new RoomItemMedia("MOVE_OUT", room.name, item.name, moveOutFile.getAbsolutePath(), now + 1);
+        RoomItemMedia moveOut = new RoomItemMedia(MODE_MOVE_OUT, room.name, item.name, moveOutFile.getAbsolutePath(), now + 1, "PHOTO", "WALKTHROUGH", null, 0L);
         moveOut.applyPropertyLinks(property.id, room.id, item.id);
         moveOut.propertyId = String.valueOf(property.id);
         moveOut.roomId = room.name;
