@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -102,10 +103,10 @@ public class InspectionWizardActivity extends AppCompatActivity {
     }
 
     private void refreshUi() {
-        textWizardMeta.setText("Property #" + propertyId + " • Mode: " + mode);
+        textWizardMeta.setText("Property #" + propertyId + " | Mode: " + mode);
 
         boolean complete = steps.isEmpty() || currentIndex >= steps.size();
-        findViewById(R.id.buttonGenerateReport).setVisibility(complete ? android.view.View.VISIBLE : android.view.View.GONE);
+        findViewById(R.id.buttonGenerateReport).setVisibility(complete ? View.VISIBLE : View.GONE);
 
         if (complete) {
             textWizardProgress.setText("Complete");
@@ -115,7 +116,7 @@ public class InspectionWizardActivity extends AppCompatActivity {
         }
 
         Step step = steps.get(currentIndex);
-        textWizardProgress.setText("Room " + step.roomPosition + "/" + step.roomTotal + " • Item " + step.itemPosition + "/" + step.itemTotal);
+        textWizardProgress.setText("Room " + step.roomPosition + "/" + step.roomTotal + " | Item " + step.itemPosition + "/" + step.itemTotal);
         textCurrentRoom.setText(step.room.name);
         textCurrentItem.setText(step.item.name);
     }
