@@ -1,5 +1,9 @@
 package com.mayneline.moveinmoveout;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
@@ -10,17 +14,16 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.mayneline.moveinmoveout.data.AppDatabase;
-import com.mayneline.moveinmoveout.data.InspectionRunEntity;
-import com.mayneline.moveinmoveout.data.PropertyEntity;
-import com.mayneline.moveinmoveout.engine.ChecklistEngineService;
-import com.mayneline.moveinmoveout.engine.ComparisonService;
-import com.mayneline.moveinmoveout.engine.ReportGenerator;
-import com.mayneline.moveinmoveout.model.ComparisonResult;
-import com.mayneline.moveinmoveout.model.ComparisonResultItem;
+import com.mayneline.moveinmoveout.data.PropertyProfile;
+import com.mayneline.moveinmoveout.data.PropertyRoom;
+import com.mayneline.moveinmoveout.data.RoomItem;
+import com.mayneline.moveinmoveout.data.RoomItemMedia;
+import com.mayneline.moveinmoveout.engine.HashUtils;
 import com.mayneline.moveinmoveout.model.ComparisonRow;
 import com.mayneline.moveinmoveout.ui.ComparisonReportAdapter;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,13 +33,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private TextView textSummary;
 
     private AppDatabase db;
-    private ComparisonService comparisonService;
-    private ReportGenerator reportGenerator;
-
-    private PropertyEntity property;
-    private InspectionRunEntity moveInRun;
-    private InspectionRunEntity moveOutRun;
-    private ComparisonResult comparisonResult;
+    private PropertyProfile property;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,22 +41,21 @@ public class ComparisonReportActivity extends AppCompatActivity {
         setContentView(R.layout.activity_comparison_report);
 
         db = AppDatabase.getInstance(this);
-        comparisonService = new ComparisonService(db);
-        reportGenerator = new ReportGenerator();
 
         recyclerComparison = findViewById(R.id.recyclerComparison);
         textEmpty = findViewById(R.id.textEmpty);
         textSummary = findViewById(R.id.textSummary);
 
         recyclerComparison.setLayoutManager(new LinearLayoutManager(this));
-        findViewById(R.id.buttonGeneratePdf).setOnClickListener(v -> generatePdf());
+        findViewById(R.id.buttonGeneratePdf).setOnClickListener(v -> loadComparisonRows());
+        findViewById(R.id.buttonSeedDemoPair).setOnClickListener(v -> seedDemoPair());
 
         loadComparisonRows();
     }
 
     private void loadComparisonRows() {
-        String propertyId = getIntent().getStringExtra("propertyId");
-        property = propertyId == null ? db.mediaDao().getLatestProperty() : db.mediaDao().getPropertyById(propertyId);
+        long propertyId = getIntent().getLongExtra("propertyProfileId", -1L);
+        property = propertyId > 0 ? db.propertyDao().getPropertyById(propertyId) : db.propertyDao().getLatestProperty();
 
         if (property == null) {
             textSummary.setText("No property found.");
@@ -68,50 +64,179 @@ public class ComparisonReportActivity extends AppCompatActivity {
             return;
         }
 
-        moveInRun = db.mediaDao().getLatestFinalizedRun(property.propertyId, "MOVE_IN");
-        moveOutRun = db.mediaDao().getLatestFinalizedRun(property.propertyId, "MOVE_OUT");
-
-        if (moveInRun == null || moveOutRun == null) {
-            textSummary.setText("Finalize both MOVE_IN and MOVE_OUT runs to compare.");
-            recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>()));
-            textEmpty.setVisibility(View.VISIBLE);
-            return;
-        }
-
-        comparisonResult = comparisonService.compareRuns(moveInRun, moveOutRun);
+        List<PropertyRoom> rooms = db.propertyRoomDao().getRoomsForProperty(property.id);
         List<ComparisonRow> rows = new ArrayList<>();
-        for (ComparisonResultItem item : comparisonResult.getItems()) {
-            rows.add(new ComparisonRow(
-                    ChecklistEngineService.displayRoomName(item.getRoomId()),
-                    ChecklistEngineService.displayItemName(item.getItemId()),
-                    item.getMoveInMediaPath(),
-                    item.getMoveOutMediaPath(),
-                    item.getStatus().name()
-            ));
+        int missingCount = 0;
+        int noChangeCount = 0;
+        int needsReviewCount = 0;
+
+        for (PropertyRoom room : rooms) {
+            List<RoomItem> items = db.roomItemDao().getItemsForRoom(room.id);
+            for (RoomItem item : items) {
+                RoomItemMedia moveIn = resolveMedia(property.id, room, item, "MOVE_IN");
+                RoomItemMedia moveOut = resolveMedia(property.id, room, item, "MOVE_OUT");
+
+                String status;
+                if (moveIn == null || moveOut == null) {
+                    status = "Media Missing";
+                    missingCount++;
+                } else if (isNoChange(moveIn, moveOut)) {
+                    status = "No Change";
+                    noChangeCount++;
+                } else {
+                    status = "Needs Review";
+                    needsReviewCount++;
+                }
+
+                rows.add(new ComparisonRow(
+                        room.name,
+                        item.name,
+                        moveIn == null ? "" : bestPath(moveIn),
+                        moveOut == null ? "" : bestPath(moveOut),
+                        status
+                ));
+            }
         }
+
+        int moveInCount = db.mediaDao().getAllMoveInForProperty(property.id).size();
+        int moveOutCount = db.mediaDao().getAllMoveOutForProperty(property.id).size();
 
         textSummary.setText(
-                "Property: " + property.address
-                        + "\nMOVE_IN " + moveInRun.runLabel + " vs MOVE_OUT " + moveOutRun.runLabel
-                        + "\nMissing: " + comparisonResult.getMissingCount()
-                        + " | No Change: " + comparisonResult.getNoChangeCount()
-                        + " | Needs Review: " + comparisonResult.getNeedsReviewCount()
+                "Property: " + property.addressLine1 + ", " + property.city + ", " + property.state + " " + property.zip
+                        + "\nMove-In entries: " + moveInCount
+                        + " | Move-Out entries: " + moveOutCount
+                        + "\nMissing: " + missingCount + " | No Change: " + noChangeCount + " | Needs Review: " + needsReviewCount
         );
+
         recyclerComparison.setAdapter(new ComparisonReportAdapter(rows));
         textEmpty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
-    private void generatePdf() {
-        if (property == null || moveInRun == null || moveOutRun == null || comparisonResult == null) {
-            Toast.makeText(this, "No finalized comparison available", Toast.LENGTH_SHORT).show();
+    private RoomItemMedia resolveMedia(long propertyId, PropertyRoom room, RoomItem item, String mode) {
+        RoomItemMedia media = db.mediaDao().getLatestForPropertyRoomItemMode(propertyId, room.id, item.id, mode);
+        if (media != null) {
+            return media;
+        }
+        media = db.mediaDao().getLatestForRoomItemTextMode(propertyId, mode, room.name, item.name);
+        if (media != null) {
+            return media;
+        }
+        return db.mediaDao().getLatestForRoomItemTextModeFallback(propertyId, String.valueOf(propertyId), mode, room.name, item.name);
+    }
+
+    private boolean isNoChange(RoomItemMedia moveIn, RoomItemMedia moveOut) {
+        String moveInPath = bestPath(moveIn);
+        String moveOutPath = bestPath(moveOut);
+
+        File moveInFile = new File(moveInPath);
+        File moveOutFile = new File(moveOutPath);
+        if (!moveInFile.exists() || !moveOutFile.exists()) {
+            return false;
+        }
+
+        if (moveInFile.length() != moveOutFile.length()) {
+            return false;
+        }
+
+        String hashA = HashUtils.sha256File(moveInPath);
+        String hashB = HashUtils.sha256File(moveOutPath);
+        if (!hashA.isEmpty() && hashA.equals(hashB)) {
+            return true;
+        }
+
+        return moveIn.timestamp == moveOut.timestamp;
+    }
+
+    private String bestPath(RoomItemMedia media) {
+        if (media == null) {
+            return "";
+        }
+        if (media.filePath != null && !media.filePath.isEmpty()) {
+            return media.filePath;
+        }
+        return media.mediaPath == null ? "" : media.mediaPath;
+    }
+
+    private void seedDemoPair() {
+        if (property == null) {
+            Toast.makeText(this, "No property available to seed", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        List<PropertyRoom> rooms = db.propertyRoomDao().getRoomsForProperty(property.id);
+        if (rooms.isEmpty()) {
+            Toast.makeText(this, "No generated rooms found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        PropertyRoom room = rooms.get(0);
+        List<RoomItem> items = db.roomItemDao().getItemsForRoom(room.id);
+        if (items.isEmpty()) {
+            Toast.makeText(this, "No generated items found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        RoomItem item = items.get(0);
+        long now = System.currentTimeMillis();
+
+        File moveInFile = createDemoImageFile(property.id, "MOVE_IN", room.id, item.id, now, "Move In");
+        File moveOutFile = createDemoImageFile(property.id, "MOVE_OUT", room.id, item.id, now + 1, "Move Out");
+
+        if (moveInFile == null || moveOutFile == null) {
+            Toast.makeText(this, "Failed to seed demo files", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        RoomItemMedia moveIn = new RoomItemMedia("MOVE_IN", room.name, item.name, moveInFile.getAbsolutePath(), now);
+        moveIn.applyPropertyLinks(property.id, room.id, item.id);
+        moveIn.propertyId = String.valueOf(property.id);
+        moveIn.roomId = room.name;
+        moveIn.itemId = item.name;
+        moveIn.mediaPath = moveInFile.getAbsolutePath();
+
+        RoomItemMedia moveOut = new RoomItemMedia("MOVE_OUT", room.name, item.name, moveOutFile.getAbsolutePath(), now + 1);
+        moveOut.applyPropertyLinks(property.id, room.id, item.id);
+        moveOut.propertyId = String.valueOf(property.id);
+        moveOut.roomId = room.name;
+        moveOut.itemId = item.name;
+        moveOut.mediaPath = moveOutFile.getAbsolutePath();
+
+        db.mediaDao().insert(moveIn);
+        db.mediaDao().insert(moveOut);
+
+        Toast.makeText(this, "Seeded demo move-in/out pair", Toast.LENGTH_SHORT).show();
+        loadComparisonRows();
+    }
+
+    private File createDemoImageFile(long propertyId, String mode, long roomId, long itemId, long timestamp, String label) {
         try {
-            File file = reportGenerator.generatePdf(this, property, moveInRun, moveOutRun, comparisonResult);
-            Toast.makeText(this, "PDF saved: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            File dir = new File(getFilesDir(), "captures/" + propertyId + "/" + mode);
+            if (!dir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                dir.mkdirs();
+            }
+
+            File outFile = new File(dir, roomId + "_" + itemId + "_demo_" + timestamp + ".jpg");
+
+            Bitmap bitmap = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor("MOVE_IN".equals(mode) ? Color.parseColor("#DFF4FF") : Color.parseColor("#FFE7D6"));
+            canvas.drawRect(0, 0, bitmap.getWidth(), bitmap.getHeight(), paint);
+            paint.setColor(Color.parseColor("#202020"));
+            paint.setTextSize(42f);
+            canvas.drawText(label + " Demo", 40, 120, paint);
+            paint.setTextSize(30f);
+            canvas.drawText("Room: " + roomId + " Item: " + itemId, 40, 190, paint);
+            canvas.drawText("Property: " + propertyId, 40, 250, paint);
+
+            try (FileOutputStream outputStream = new FileOutputStream(outFile)) {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
+            }
+            bitmap.recycle();
+            return outFile;
         } catch (Exception exception) {
-            Toast.makeText(this, "Failed to generate PDF", Toast.LENGTH_SHORT).show();
+            return null;
         }
     }
 }

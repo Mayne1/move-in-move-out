@@ -26,7 +26,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="Generate PDF" />
+        android:text="Generate Comparison Report" />
+
+    <Button
+        android:id="@+id/buttonSeedDemoPair"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Seed Demo Pair" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerComparison"

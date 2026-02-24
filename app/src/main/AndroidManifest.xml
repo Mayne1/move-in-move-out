@@ -15,6 +15,12 @@
             android:name=".BuildInfoActivity"
             android:exported="false" />
         <activity
+            android:name=".InspectionWizardActivity"
+            android:exported="false" />
+        <activity
+            android:name=".PropertyProfileActivity"
+            android:exported="false" />
+        <activity
             android:name=".SetupActivity"
             android:exported="false" />
         <activity

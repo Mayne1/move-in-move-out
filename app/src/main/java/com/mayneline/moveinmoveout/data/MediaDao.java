@@ -10,6 +10,9 @@ import java.util.List;
 @Dao
 public interface MediaDao {
     @Insert
+    long insert(RoomItemMedia media);
+
+    @Insert
     void insertProperty(PropertyEntity property);
 
     @Query("SELECT * FROM properties WHERE propertyId = :propertyId LIMIT 1")
@@ -59,4 +62,25 @@ public interface MediaDao {
 
     @Query("SELECT COUNT(DISTINCT roomId || '|' || itemId) FROM room_item_media WHERE runId = :runId")
     int countCompletedChecklistItemsForRun(String runId);
+
+    @Query("SELECT * FROM room_item_media WHERE propertyProfileId = :propertyId AND mode = 'MOVE_IN' ORDER BY timestamp DESC")
+    List<RoomItemMedia> getAllMoveInForProperty(long propertyId);
+
+    @Query("SELECT * FROM room_item_media WHERE propertyProfileId = :propertyId AND mode = 'MOVE_OUT' ORDER BY timestamp DESC")
+    List<RoomItemMedia> getAllMoveOutForProperty(long propertyId);
+
+    @Query("SELECT * FROM room_item_media WHERE propertyProfileId = :propertyId AND propertyRoomId = :propertyRoomId AND roomItemId = :roomItemId AND mode = :mode ORDER BY timestamp DESC LIMIT 1")
+    RoomItemMedia getLatestForPropertyRoomItemMode(long propertyId, long propertyRoomId, long roomItemId, String mode);
+
+    @Query("SELECT * FROM room_item_media WHERE propertyProfileId = :propertyId AND mode = :mode AND room = :roomName AND item = :itemName ORDER BY timestamp DESC LIMIT 1")
+    RoomItemMedia getLatestForRoomItemTextMode(long propertyId, String mode, String roomName, String itemName);
+
+    @Query("SELECT * FROM room_item_media WHERE mode = :mode AND room = :roomName AND item = :itemName AND (propertyProfileId = :propertyId OR propertyProfileId IS NULL OR propertyId = :propertyIdText) ORDER BY timestamp DESC LIMIT 1")
+    RoomItemMedia getLatestForRoomItemTextModeFallback(long propertyId, String propertyIdText, String mode, String roomName, String itemName);
+
+    @Query("SELECT * FROM room_item_media WHERE mode = 'MOVE_IN' AND room = :room AND item = :item ORDER BY timestamp DESC LIMIT 1")
+    RoomItemMedia getMoveInMedia(String room, String item);
+
+    @Query("SELECT * FROM room_item_media WHERE mode = 'MOVE_OUT' AND room = :room AND item = :item ORDER BY timestamp DESC LIMIT 1")
+    RoomItemMedia getMoveOutMedia(String room, String item);
 }

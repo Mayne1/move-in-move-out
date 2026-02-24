@@ -69,7 +69,15 @@
             android:id="@+id/buttonSettings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
             android:minHeight="64dp"
             android:text="Settings" />
+
+        <Button
+            android:id="@+id/buttonBuildInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="64dp"
+            android:text="Build Info" />
     </LinearLayout>
 </ScrollView>

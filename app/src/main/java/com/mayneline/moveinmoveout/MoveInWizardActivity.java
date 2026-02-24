@@ -19,6 +19,17 @@ public class MoveInWizardActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        long propertyId = getIntent().getLongExtra("propertyId", -1L);
+        if (propertyId > 0) {
+            Intent intent = new Intent(this, InspectionWizardActivity.class);
+            intent.putExtra("mode", MODE_MOVE_IN);
+            intent.putExtra("propertyId", propertyId);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_move_in_wizard);
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);

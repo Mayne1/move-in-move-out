@@ -2,6 +2,7 @@ package com.mayneline.moveinmoveout.data;
 
 import androidx.annotation.NonNull;
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 @Entity(tableName = "room_item_media")
@@ -10,32 +11,50 @@ public class RoomItemMedia {
     public long id;
 
     @NonNull
-    public String propertyId;
-
-    @NonNull
-    public String runId;
-
-    @NonNull
     public String mode;
 
     @NonNull
+    public String room;
+
+    @NonNull
+    public String item;
+
+    @NonNull
+    public String filePath;
+
+    public long timestamp;
+
+    public Long propertyProfileId;
+    public Long propertyRoomId;
+    public Long roomItemId;
+
+    // Legacy fields kept for backwards compatibility with pre-MVP flows.
+    public String propertyId;
+    public String runId;
     public String runLabel;
-
-    @NonNull
     public String roomId;
-
-    @NonNull
     public String itemId;
-
-    @NonNull
     public String mediaPath;
 
     public String note;
-    public long timestamp;
-
-    @NonNull
     public String mediaSha256;
 
+    public RoomItemMedia() {
+    }
+
+    @Ignore
+    public RoomItemMedia(@NonNull String mode, @NonNull String room, @NonNull String item, @NonNull String filePath, long timestamp) {
+        this.mode = mode;
+        this.room = room;
+        this.item = item;
+        this.filePath = filePath;
+        this.timestamp = timestamp;
+        this.roomId = room;
+        this.itemId = item;
+        this.mediaPath = filePath;
+    }
+
+    @Ignore
     public RoomItemMedia(
             @NonNull String propertyId,
             @NonNull String runId,
@@ -48,15 +67,17 @@ public class RoomItemMedia {
             long timestamp,
             @NonNull String mediaSha256
     ) {
+        this(mode, roomId, itemId, mediaPath, timestamp);
         this.propertyId = propertyId;
         this.runId = runId;
-        this.mode = mode;
         this.runLabel = runLabel;
-        this.roomId = roomId;
-        this.itemId = itemId;
-        this.mediaPath = mediaPath;
         this.note = note;
-        this.timestamp = timestamp;
         this.mediaSha256 = mediaSha256;
+    }
+
+    public void applyPropertyLinks(Long propertyProfileId, Long propertyRoomId, Long roomItemId) {
+        this.propertyProfileId = propertyProfileId;
+        this.propertyRoomId = propertyRoomId;
+        this.roomItemId = roomItemId;
     }
 }

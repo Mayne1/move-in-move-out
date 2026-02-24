@@ -11,13 +11,19 @@ import androidx.room.RoomDatabase;
                 RoomItemMedia.class,
                 PropertyEntity.class,
                 ChecklistStructureEntity.class,
-                InspectionRunEntity.class
+                InspectionRunEntity.class,
+                PropertyProfile.class,
+                PropertyRoom.class,
+                RoomItem.class
         },
-        version = 3,
+        version = 4,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
     public abstract MediaDao mediaDao();
+    public abstract PropertyDao propertyDao();
+    public abstract PropertyRoomDao propertyRoomDao();
+    public abstract RoomItemDao roomItemDao();
 
     private static volatile AppDatabase INSTANCE;
 

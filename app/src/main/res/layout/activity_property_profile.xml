@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="Property Intake"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/editAddressLine1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="Address Line 1"
+            android:inputType="textPostalAddress" />
+
+        <EditText
+            android:id="@+id/editCity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="City"
+            android:inputType="textCapWords" />
+
+        <EditText
+            android:id="@+id/editState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="State"
+            android:inputType="textCapCharacters" />
+
+        <EditText
+            android:id="@+id/editZip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="ZIP"
+            android:inputType="number" />
+
+        <EditText
+            android:id="@+id/editBedrooms"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="Bedrooms"
+            android:inputType="number"
+            android:text="2" />
+
+        <EditText
+            android:id="@+id/editBathrooms"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:hint="Bathrooms (e.g. 1, 1.5, 2)"
+            android:inputType="numberDecimal"
+            android:text="1" />
+
+        <Switch
+            android:id="@+id/switchGarage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Has Garage" />
+
+        <Spinner
+            android:id="@+id/spinnerGarageType"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="10dp" />
+
+        <Switch
+            android:id="@+id/switchYard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Has Yard" />
+
+        <Switch
+            android:id="@+id/switchSprinklers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="14dp"
+            android:text="Has Sprinklers" />
+
+        <Button
+            android:id="@+id/buttonSaveGenerate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Save &amp; Generate Checklist" />
+
+        <TextView
+            android:id="@+id/textPropertyStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="#EDEDED"
+            android:padding="10dp"
+            android:text="Enter property details." />
+
+    </LinearLayout>
+</ScrollView>
