@@ -21,12 +21,68 @@
         android:text="Move In vs Move Out"
         android:textSize="14sp" />
 
-    <Button
-        android:id="@+id/buttonGeneratePdf"
+    <TextView
+        android:id="@+id/textScope"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="Generate Comparison Report" />
+        android:text="Scope: Whole property" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/buttonFilterAll"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="All" />
+
+        <Button
+            android:id="@+id/buttonFilterMissing"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Missing" />
+
+        <Button
+            android:id="@+id/buttonFilterNeedsReview"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Review" />
+
+        <Button
+            android:id="@+id/buttonFilterNoChange"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="No Change" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/buttonRefreshComparison"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Refresh Comparison" />
+
+    <Button
+        android:id="@+id/buttonSelectScope"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Select Scope" />
+
+    <Button
+        android:id="@+id/buttonExportPdf"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Export PDF Report" />
 
     <Button
         android:id="@+id/buttonSeedDemoPair"

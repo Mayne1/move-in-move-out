@@ -43,6 +43,10 @@ public class RoomItemMedia {
 
     public String note;
     public String mediaSha256;
+    public String sha256;
+    public long fileBytes;
+    public String mimeType;
+    public String capturedAtIso;
 
     public RoomItemMedia() {
         this.mediaType = "PHOTO";

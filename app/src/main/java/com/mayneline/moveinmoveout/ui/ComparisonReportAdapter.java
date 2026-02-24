@@ -1,5 +1,8 @@
 package com.mayneline.moveinmoveout.ui;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -51,6 +54,9 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
         private final TextView textMoveInMediaType;
         private final TextView textMoveOutMediaType;
         private final TextView textStatus;
+        private final View layoutDetails;
+        private final TextView textMoveInDetails;
+        private final TextView textMoveOutDetails;
 
         ComparisonViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -61,6 +67,9 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             textMoveInMediaType = itemView.findViewById(R.id.textMoveInMediaType);
             textMoveOutMediaType = itemView.findViewById(R.id.textMoveOutMediaType);
             textStatus = itemView.findViewById(R.id.textStatus);
+            layoutDetails = itemView.findViewById(R.id.layoutDetails);
+            textMoveInDetails = itemView.findViewById(R.id.textMoveInDetails);
+            textMoveOutDetails = itemView.findViewById(R.id.textMoveOutDetails);
         }
 
         void bind(ComparisonRow row) {
@@ -70,6 +79,18 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             bindImage(imageMoveOut, textMoveOutMediaType, row.getMoveOutPath(), row.getMoveOutMediaType());
             textStatus.setText("Status: " + row.getStatus());
             textStatus.setTextColor(statusColor(row.getStatus()));
+
+            textMoveInDetails.setText(formatDetails("Move In", row.getMoveInCapturedAt(), row.getMoveInSha256(), row.getMoveInFileBytes()));
+            textMoveOutDetails.setText(formatDetails("Move Out", row.getMoveOutCapturedAt(), row.getMoveOutSha256(), row.getMoveOutFileBytes()));
+            layoutDetails.setVisibility(row.isExpanded() ? View.VISIBLE : View.GONE);
+
+            textStatus.setOnClickListener(v -> {
+                row.toggleExpanded();
+                layoutDetails.setVisibility(row.isExpanded() ? View.VISIBLE : View.GONE);
+            });
+
+            textMoveInDetails.setOnClickListener(v -> copyHash(v.getContext(), row.getMoveInSha256()));
+            textMoveOutDetails.setOnClickListener(v -> copyHash(v.getContext(), row.getMoveOutSha256()));
         }
 
         private void bindImage(ImageView imageView, TextView mediaTypeView, String path, String mediaType) {
@@ -108,6 +129,25 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
                 return Color.parseColor("#B71C1C");
             }
             return Color.parseColor("#E65100");
+        }
+
+        private String formatDetails(String label, String capturedAt, String hash, long fileBytes) {
+            String shortHash = hash == null || hash.isEmpty() ? "-" : hash.substring(0, Math.min(10, hash.length()));
+            return label
+                    + " | Time: " + (capturedAt == null || capturedAt.isEmpty() ? "-" : capturedAt)
+                    + " | Hash: " + shortHash
+                    + " | Size: " + fileBytes + " bytes";
+        }
+
+        private void copyHash(Context context, String hash) {
+            if (hash == null || hash.isEmpty()) {
+                return;
+            }
+            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null) {
+                return;
+            }
+            clipboard.setPrimaryClip(ClipData.newPlainText("sha256", hash));
         }
     }
 }

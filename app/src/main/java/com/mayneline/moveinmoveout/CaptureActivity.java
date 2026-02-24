@@ -1,15 +1,18 @@
 package com.mayneline.moveinmoveout;
 
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.mayneline.moveinmoveout.data.AppDatabase;
@@ -17,12 +20,13 @@ import com.mayneline.moveinmoveout.data.ChecklistStructureEntity;
 import com.mayneline.moveinmoveout.data.InspectionRunEntity;
 import com.mayneline.moveinmoveout.data.RoomItemMedia;
 import com.mayneline.moveinmoveout.engine.ChecklistEngineService;
+import com.mayneline.moveinmoveout.engine.EvidenceFileUtil;
 import com.mayneline.moveinmoveout.engine.HashUtils;
 import com.mayneline.moveinmoveout.engine.RunService;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +35,9 @@ public class CaptureActivity extends AppCompatActivity {
     private TextView textCaptureTip;
     private TextView textCompletion;
     private EditText editNote;
+    private View buttonPhoto;
+    private View buttonVideo;
+    private View buttonFinalizeRun;
 
     private AppDatabase db;
     private RunService runService;
@@ -40,6 +47,9 @@ public class CaptureActivity extends AppCompatActivity {
     private InspectionRunEntity run;
     private List<ChecklistStructureEntity> checklist = new ArrayList<>();
     private int currentIndex = 0;
+
+    private ActivityResultLauncher<Intent> photoLauncher;
+    private ActivityResultLauncher<Intent> videoLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,17 +63,40 @@ public class CaptureActivity extends AppCompatActivity {
         textCaptureTip = findViewById(R.id.textCaptureTip);
         textCompletion = findViewById(R.id.textCompletion);
         editNote = findViewById(R.id.editNote);
+        buttonPhoto = findViewById(R.id.buttonPhoto);
+        buttonVideo = findViewById(R.id.buttonVideo);
+        buttonFinalizeRun = findViewById(R.id.buttonFinalizeRun);
+
+        findViewById(R.id.buttonPreviousItem).setVisibility(View.GONE);
+        findViewById(R.id.buttonNextItem).setVisibility(View.GONE);
 
         propertyId = getIntent().getStringExtra("propertyId");
         runId = getIntent().getStringExtra("runId");
 
+        photoLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                Object data = result.getData().getExtras() == null ? null : result.getData().getExtras().get("data");
+                if (data instanceof Bitmap) {
+                    persistPhoto((Bitmap) data);
+                } else {
+                    Toast.makeText(this, "Photo capture failed", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        videoLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() == RESULT_OK && result.getData() != null && result.getData().getData() != null) {
+                persistVideo(result.getData().getData());
+            } else {
+                Toast.makeText(this, "Video capture failed", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         loadRunState();
 
-        findViewById(R.id.buttonPhoto).setOnClickListener(v -> captureAndStoreMedia("PHOTO"));
-        findViewById(R.id.buttonVideo).setOnClickListener(v -> captureAndStoreMedia("VIDEO"));
-        findViewById(R.id.buttonPreviousItem).setOnClickListener(v -> movePrevious());
-        findViewById(R.id.buttonNextItem).setOnClickListener(v -> moveNext(false));
-        findViewById(R.id.buttonFinalizeRun).setOnClickListener(v -> showFinalizeDialog());
+        buttonPhoto.setOnClickListener(v -> launchPhoto());
+        buttonVideo.setOnClickListener(v -> launchVideo());
+        buttonFinalizeRun.setOnClickListener(v -> showFinalizeDialog());
     }
 
     private void loadRunState() {
@@ -119,78 +152,122 @@ public class CaptureActivity extends AppCompatActivity {
         textCompletion.setText("Completion: " + completion + "%");
 
         boolean locked = run.finalized;
-        findViewById(R.id.buttonPreviousItem).setEnabled(!locked && currentIndex > 0);
-        findViewById(R.id.buttonNextItem).setEnabled(!locked && currentIndex < checklist.size() - 1);
-        findViewById(R.id.buttonPhoto).setEnabled(!locked);
-        findViewById(R.id.buttonVideo).setEnabled(!locked);
-        findViewById(R.id.buttonFinalizeRun).setEnabled(!locked);
+        buttonPhoto.setEnabled(!locked);
+        buttonVideo.setEnabled(!locked);
+        buttonFinalizeRun.setEnabled(!locked);
 
         if (locked) {
             textCaptureTip.setText("Run is finalized and locked.");
+        } else if (!isCurrentItemCaptured()) {
+            textCaptureTip.setText("Linear flow: capture this item to proceed.");
+        } else {
+            textCaptureTip.setText("Item captured. Continue with the next required item.");
         }
     }
 
-    private void captureAndStoreMedia(String captureType) {
-        try {
-            run = runService.requireEditableRun(runId);
-        } catch (Exception exception) {
-            Toast.makeText(this, exception.getMessage(), Toast.LENGTH_SHORT).show();
-            refreshUi();
+    private void launchPhoto() {
+        if (!prepareEditableRun()) {
             return;
         }
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        photoLauncher.launch(intent);
+    }
 
+    private void launchVideo() {
+        if (!prepareEditableRun()) {
+            return;
+        }
+        Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+        videoLauncher.launch(intent);
+    }
+
+    private void persistPhoto(Bitmap bitmap) {
         ChecklistStructureEntity current = checklist.get(currentIndex);
         long timestamp = System.currentTimeMillis();
         File mediaFile = new File(
                 getOrCreateCaptureDir(),
-                captureType.toLowerCase() + "_" + sanitize(run.runLabel) + "_" + sanitize(current.roomId)
-                        + "_" + sanitize(current.itemId) + "_" + timestamp + ".jpg"
+                sanitize(propertyId) + "_" + sanitize(runId) + "_" + sanitize(current.roomId)
+                        + "_" + sanitize(current.itemId) + "_photo_" + timestamp + ".jpg"
         );
 
-        try {
-            writePlaceholderImage(
-                    mediaFile,
-                    run.mode,
-                    current.roomId,
-                    current.itemId,
-                    captureType,
-                    timestamp
-            );
-
-            String mediaHash = HashUtils.sha256File(mediaFile.getAbsolutePath());
-            RoomItemMedia media = new RoomItemMedia(
-                    propertyId,
-                    runId,
-                    run.mode,
-                    run.runLabel,
-                    current.roomId,
-                    current.itemId,
-                    mediaFile.getAbsolutePath(),
-                    safeText(editNote.getText().toString()),
-                    timestamp,
-                    mediaHash
-            );
-            db.mediaDao().insertMedia(media);
-            editNote.setText("");
-            Toast.makeText(this, captureType + " saved", Toast.LENGTH_SHORT).show();
-            moveNext(true);
-        } catch (IOException exception) {
+        try (FileOutputStream outputStream = new FileOutputStream(mediaFile)) {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
+            persistMediaRow(current, mediaFile.getAbsolutePath(), timestamp, "PHOTO", "image/jpeg");
+            Toast.makeText(this, "Photo saved", Toast.LENGTH_SHORT).show();
+            moveNext();
+        } catch (Exception exception) {
             Toast.makeText(this, "Failed to save media", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void movePrevious() {
-        if (currentIndex > 0) {
-            currentIndex--;
-            refreshUi();
+    private void persistVideo(Uri uri) {
+        ChecklistStructureEntity current = checklist.get(currentIndex);
+        long timestamp = System.currentTimeMillis();
+        File mediaFile = new File(
+                getOrCreateCaptureDir(),
+                sanitize(propertyId) + "_" + sanitize(runId) + "_" + sanitize(current.roomId)
+                        + "_" + sanitize(current.itemId) + "_video_" + timestamp + ".mp4"
+        );
+
+        try (InputStream inputStream = getContentResolver().openInputStream(uri);
+             FileOutputStream outputStream = new FileOutputStream(mediaFile)) {
+            if (inputStream == null) {
+                Toast.makeText(this, "Video capture failed", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, read);
+            }
+            persistMediaRow(current, mediaFile.getAbsolutePath(), timestamp, "VIDEO", "video/mp4");
+            Toast.makeText(this, "Video saved", Toast.LENGTH_SHORT).show();
+            moveNext();
+        } catch (Exception exception) {
+            Toast.makeText(this, "Failed to save media", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void moveNext(boolean afterCapture) {
+    private void persistMediaRow(ChecklistStructureEntity current, String path, long timestamp, String mediaType, String fallbackMime) {
+        String mediaHash = HashUtils.sha256File(path);
+        RoomItemMedia media = new RoomItemMedia(
+                propertyId,
+                runId,
+                run.mode,
+                run.runLabel,
+                current.roomId,
+                current.itemId,
+                path,
+                safeText(editNote.getText().toString()),
+                timestamp,
+                mediaHash
+        );
+        media.mediaType = mediaType;
+        media.tag = "WALKTHROUGH";
+        media.sha256 = mediaHash;
+        media.fileBytes = EvidenceFileUtil.sizeBytes(path);
+        media.mimeType = EvidenceFileUtil.detectMimeType(path, fallbackMime);
+        media.capturedAtIso = EvidenceFileUtil.isoTimestamp(timestamp);
+        db.mediaDao().insertMedia(media);
+        editNote.setText("");
+    }
+
+    private boolean prepareEditableRun() {
+        try {
+            run = runService.requireEditableRun(runId);
+            return true;
+        } catch (Exception exception) {
+            Toast.makeText(this, exception.getMessage(), Toast.LENGTH_SHORT).show();
+            refreshUi();
+            return false;
+        }
+    }
+
+    private void moveNext() {
         if (currentIndex < checklist.size() - 1) {
             currentIndex++;
             refreshUi();
-        } else if (afterCapture) {
+        } else {
             refreshUi();
             Toast.makeText(this, "Checklist reached end. Finalize when ready.", Toast.LENGTH_SHORT).show();
         }
@@ -224,11 +301,9 @@ public class CaptureActivity extends AppCompatActivity {
     }
 
     private void disableCaptureActions() {
-        findViewById(R.id.buttonPreviousItem).setEnabled(false);
-        findViewById(R.id.buttonNextItem).setEnabled(false);
-        findViewById(R.id.buttonPhoto).setEnabled(false);
-        findViewById(R.id.buttonVideo).setEnabled(false);
-        findViewById(R.id.buttonFinalizeRun).setEnabled(false);
+        buttonPhoto.setEnabled(false);
+        buttonVideo.setEnabled(false);
+        buttonFinalizeRun.setEnabled(false);
     }
 
     private File getOrCreateCaptureDir() {
@@ -240,43 +315,20 @@ public class CaptureActivity extends AppCompatActivity {
         return capturesDir;
     }
 
-    private void writePlaceholderImage(
-            File outFile,
-            String mode,
-            String roomId,
-            String itemId,
-            String captureType,
-            long timestamp
-    ) throws IOException {
-        Bitmap bitmap = Bitmap.createBitmap(960, 720, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
-        paint.setColor("PHOTO".equals(captureType) ? Color.parseColor("#DFF4FF") : Color.parseColor("#FFEFD6"));
-        canvas.drawRect(0, 0, bitmap.getWidth(), bitmap.getHeight(), paint);
-
-        paint.setColor(Color.parseColor("#1B1B1B"));
-        paint.setTextSize(42f);
-        canvas.drawText("Move In Move Out", 48, 100, paint);
-        paint.setTextSize(34f);
-        canvas.drawText("Type: " + captureType, 48, 170, paint);
-        canvas.drawText("Mode: " + mode, 48, 240, paint);
-        canvas.drawText("Room: " + ChecklistEngineService.displayRoomName(roomId), 48, 310, paint);
-        canvas.drawText("Item: " + ChecklistEngineService.displayItemName(itemId), 48, 380, paint);
-        canvas.drawText("Timestamp: " + timestamp, 48, 450, paint);
-
-        try (FileOutputStream outputStream = new FileOutputStream(outFile)) {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-        } finally {
-            bitmap.recycle();
-        }
-    }
-
     private String sanitize(String value) {
         return value == null ? "" : value.replaceAll("[^A-Za-z0-9_\\-]", "_");
     }
 
     private String safeText(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean isCurrentItemCaptured() {
+        if (checklist.isEmpty() || runId == null || runId.isEmpty()) {
+            return false;
+        }
+        ChecklistStructureEntity current = checklist.get(currentIndex);
+        RoomItemMedia media = db.mediaDao().getLatestMediaForRunItem(runId, current.roomId, current.itemId);
+        return media != null && media.mediaPath != null && !media.mediaPath.isEmpty();
     }
 }

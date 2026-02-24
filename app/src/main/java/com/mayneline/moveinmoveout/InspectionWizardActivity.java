@@ -20,6 +20,8 @@ import com.mayneline.moveinmoveout.data.AppDatabase;
 import com.mayneline.moveinmoveout.data.PropertyRoom;
 import com.mayneline.moveinmoveout.data.RoomItem;
 import com.mayneline.moveinmoveout.data.RoomItemMedia;
+import com.mayneline.moveinmoveout.engine.EvidenceFileUtil;
+import com.mayneline.moveinmoveout.engine.HashUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -299,6 +301,11 @@ public class InspectionWizardActivity extends AppCompatActivity {
         media.roomId = step.room.name;
         media.itemId = step.item.name;
         media.mediaPath = filePath;
+        media.sha256 = HashUtils.sha256File(filePath);
+        media.mediaSha256 = media.sha256;
+        media.fileBytes = EvidenceFileUtil.sizeBytes(filePath);
+        media.mimeType = EvidenceFileUtil.detectMimeType(filePath, MEDIA_VIDEO.equals(mediaType) ? "video/mp4" : "image/jpeg");
+        media.capturedAtIso = EvidenceFileUtil.isoTimestamp(ts);
         db.mediaDao().insert(media);
     }
 
