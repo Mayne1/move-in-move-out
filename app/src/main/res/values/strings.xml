@@ -16,4 +16,18 @@
     <string name="wizard_add_note">Add Note</string>
     <string name="wizard_note_saved">Note saved</string>
     <string name="wizard_capture_required">Capture a walkthrough photo or video before continuing.</string>
+    <string name="timeline_title_format">%1$s - %2$s</string>
+    <string name="timeline_no_evidence">No evidence</string>
+    <string name="timeline_note_suffix"> | %1$s</string>
+    <string name="timeline_entry_text">%1$s%2$s</string>
+    <string name="comparison_open_from_properties">Open this report from Properties to load cloud comparison data.</string>
+    <string name="comparison_loading">Loading cloud comparison...</string>
+    <string name="comparison_load_failed">Failed to load cloud comparison data.</string>
+    <string name="comparison_summary_text">Property: %1$s
+\nMove-In entries: %2$d | Move-Out entries: %3$d
+\nMissing: %4$d | No Change: %5$d | Needs Review: %6$d
+\nFiltered rows: %7$d</string>
+    <string name="scope_whole_property">Scope: Whole property</string>
+    <string name="scope_room_count">Scope: %1$d room(s)</string>
+    <string name="scope_item_count">Scope: %1$d item(s)</string>
 </resources>

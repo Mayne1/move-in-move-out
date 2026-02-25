@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
@@ -49,8 +50,6 @@ public class TimelineActivity extends AppCompatActivity {
     private TimelineEntry repairEntry;
     private TimelineEntry moveOutEntry;
 
-    private TextView textTimelineProperty;
-    private TextView textTimelineTitle;
     private TextView textTimelineMoveIn;
     private TextView textTimelineRepair;
     private TextView textTimelineMoveOut;
@@ -71,8 +70,8 @@ public class TimelineActivity extends AppCompatActivity {
         roomName = safe(getIntent().getStringExtra("roomName"));
         itemName = safe(getIntent().getStringExtra("itemName"));
 
-        textTimelineProperty = findViewById(R.id.textTimelineProperty);
-        textTimelineTitle = findViewById(R.id.textTimelineTitle);
+        TextView textTimelineProperty = findViewById(R.id.textTimelineProperty);
+        TextView textTimelineTitle = findViewById(R.id.textTimelineTitle);
         textTimelineMoveIn = findViewById(R.id.textTimelineMoveIn);
         textTimelineRepair = findViewById(R.id.textTimelineRepair);
         textTimelineMoveOut = findViewById(R.id.textTimelineMoveOut);
@@ -80,7 +79,7 @@ public class TimelineActivity extends AppCompatActivity {
         imageTimelineRepair = findViewById(R.id.imageTimelineRepair);
         imageTimelineMoveOut = findViewById(R.id.imageTimelineMoveOut);
 
-        textTimelineTitle.setText(roomName + " - " + itemName);
+        textTimelineTitle.setText(getString(R.string.timeline_title_format, roomName, itemName));
         textTimelineProperty.setText(propertyAddress);
 
         repairPhotoLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -116,7 +115,7 @@ public class TimelineActivity extends AppCompatActivity {
             return;
         }
 
-        repository.getLatestInspectionForMode(firestorePropertyId, "REPAIR", new FirebaseRepository.RepoCallback<FirebaseRepository.InspectionSummary>() {
+        repository.getLatestInspectionForMode(firestorePropertyId, "REPAIR", new FirebaseRepository.RepoCallback<>() {
             @Override
             public void onSuccess(FirebaseRepository.InspectionSummary result) {
                 if (result != null && result.inspectionId != null && !result.inspectionId.isEmpty()) {
@@ -124,7 +123,7 @@ public class TimelineActivity extends AppCompatActivity {
                     runOnUiThread(TimelineActivity.this::launchRepairCapture);
                     return;
                 }
-                repository.createInspection(firestorePropertyId, "REPAIR", new FirebaseRepository.RepoCallback<String>() {
+                repository.createInspection(firestorePropertyId, "REPAIR", new FirebaseRepository.RepoCallback<>() {
                     @Override
                     public void onSuccess(String result) {
                         repairInspectionId = result;
@@ -132,14 +131,14 @@ public class TimelineActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onError(Exception exception) {
+                    public void onError(@NonNull Exception exception) {
                         runOnUiThread(() -> Toast.makeText(TimelineActivity.this, "Could not create repair session", Toast.LENGTH_SHORT).show());
                     }
                 });
             }
 
             @Override
-            public void onError(Exception exception) {
+            public void onError(@NonNull Exception exception) {
                 runOnUiThread(() -> Toast.makeText(TimelineActivity.this, "Could not load repair session", Toast.LENGTH_SHORT).show());
             }
         });
@@ -192,7 +191,7 @@ public class TimelineActivity extends AppCompatActivity {
                     media.tags = new ArrayList<>();
                     media.tags.add("REPAIR");
 
-                    repository.addMediaRecord(firestorePropertyId, repairInspectionId, media, new FirebaseRepository.RepoCallback<String>() {
+                    repository.addMediaRecord(firestorePropertyId, repairInspectionId, media, new FirebaseRepository.RepoCallback<>() {
                         @Override
                         public void onSuccess(String result) {
                             runOnUiThread(() -> {
@@ -202,7 +201,7 @@ public class TimelineActivity extends AppCompatActivity {
                         }
 
                         @Override
-                        public void onError(Exception exception) {
+                        public void onError(@NonNull Exception exception) {
                             runOnUiThread(() -> Toast.makeText(TimelineActivity.this, "Failed to save repair evidence", Toast.LENGTH_SHORT).show());
                         }
                     });
@@ -312,7 +311,7 @@ public class TimelineActivity extends AppCompatActivity {
     private void bindEntry(ImageView imageView, TextView textView, TimelineEntry entry) {
         if (entry == null || entry.path == null || entry.path.isEmpty()) {
             imageView.setImageResource(android.R.drawable.ic_menu_report_image);
-            textView.setText("No evidence");
+            textView.setText(getString(R.string.timeline_no_evidence));
             return;
         }
 
@@ -324,8 +323,9 @@ public class TimelineActivity extends AppCompatActivity {
         } else {
             imageView.setImageResource(android.R.drawable.ic_menu_report_image);
         }
-        textView.setText((entry.timestampIso == null || entry.timestampIso.isEmpty() ? "-" : entry.timestampIso)
-                + (entry.note == null || entry.note.isEmpty() ? "" : " | " + entry.note));
+        String timestamp = (entry.timestampIso == null || entry.timestampIso.isEmpty()) ? "-" : entry.timestampIso;
+        String noteSuffix = (entry.note == null || entry.note.isEmpty()) ? "" : getString(R.string.timeline_note_suffix, entry.note);
+        textView.setText(getString(R.string.timeline_entry_text, timestamp, noteSuffix));
     }
 
     private void exportRepairAppendix() {

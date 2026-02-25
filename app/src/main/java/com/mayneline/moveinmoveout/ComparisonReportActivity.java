@@ -111,13 +111,13 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private void loadComparisonRows() {
         firestorePropertyId = safe(getIntent().getStringExtra("firestorePropertyId"));
         if (firestorePropertyId.isEmpty()) {
-            textSummary.setText("Open this report from Properties to load cloud comparison data.");
+            textSummary.setText(getString(R.string.comparison_open_from_properties));
             recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails, this::openRepairTimeline));
             textEmpty.setVisibility(View.VISIBLE);
             return;
         }
 
-        textSummary.setText("Loading cloud comparison...");
+        textSummary.setText(getString(R.string.comparison_loading));
         executor.execute(() -> {
             try {
                 ComparisonService service = new ComparisonService();
@@ -160,7 +160,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
                 });
             } catch (Exception exception) {
                 runOnUiThread(() -> {
-                    textSummary.setText("Failed to load cloud comparison data.");
+                    textSummary.setText(getString(R.string.comparison_load_failed));
                     recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails, this::openRepairTimeline));
                     textEmpty.setVisibility(View.VISIBLE);
                 });
@@ -235,15 +235,16 @@ public class ComparisonReportActivity extends AppCompatActivity {
             }
         }
 
-        textSummary.setText(
-                "Property: " + propertyAddress
-                        + "\nMove-In entries: " + totalMoveInEntries
-                        + " | Move-Out entries: " + totalMoveOutEntries
-                        + "\nMissing: " + missing
-                        + " | No Change: " + noChange
-                        + " | Needs Review: " + needsReview
-                        + "\nFiltered rows: " + filteredRows.size()
-        );
+        textSummary.setText(getString(
+                R.string.comparison_summary_text,
+                propertyAddress,
+                totalMoveInEntries,
+                totalMoveOutEntries,
+                missing,
+                noChange,
+                needsReview,
+                filteredRows.size()
+        ));
     }
 
     private void showScopeModeDialog() {
@@ -335,11 +336,11 @@ public class ComparisonReportActivity extends AppCompatActivity {
 
     private void updateScopeLabel() {
         if (activeScope == SCOPE_WHOLE_PROPERTY) {
-            textScope.setText("Scope: Whole property");
+            textScope.setText(getString(R.string.scope_whole_property));
         } else if (activeScope == SCOPE_SELECTED_ROOMS) {
-            textScope.setText("Scope: " + selectedRooms.size() + " room(s)");
+            textScope.setText(getString(R.string.scope_room_count, selectedRooms.size()));
         } else {
-            textScope.setText("Scope: " + selectedItems.size() + " item(s)");
+            textScope.setText(getString(R.string.scope_item_count, selectedItems.size()));
         }
     }
 
