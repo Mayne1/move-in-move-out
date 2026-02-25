@@ -12,6 +12,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.mayneline.moveinmoveout.data.AppDatabase;
 import com.mayneline.moveinmoveout.data.PropertyProfile;
+import com.mayneline.moveinmoveout.firebase.SyncWorkScheduler;
 
 public class HomeActivity extends AppCompatActivity {
     private AppDatabase db;
@@ -29,6 +30,7 @@ public class HomeActivity extends AppCompatActivity {
         if (!ensureAuthAndRole()) {
             return;
         }
+        SyncWorkScheduler.enqueueMediaSync(this);
 
         findViewById(R.id.buttonMoveIn).setOnClickListener(v ->
                 startGuidedFlow("MOVE_IN"));

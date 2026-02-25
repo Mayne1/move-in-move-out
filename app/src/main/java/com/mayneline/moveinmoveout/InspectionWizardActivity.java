@@ -16,12 +16,16 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 import com.mayneline.moveinmoveout.data.AppDatabase;
 import com.mayneline.moveinmoveout.data.PropertyRoom;
 import com.mayneline.moveinmoveout.data.RoomItem;
 import com.mayneline.moveinmoveout.data.RoomItemMedia;
 import com.mayneline.moveinmoveout.engine.EvidenceFileUtil;
 import com.mayneline.moveinmoveout.engine.HashUtils;
+import com.mayneline.moveinmoveout.firebase.FirebaseRepository;
+import com.mayneline.moveinmoveout.firebase.SyncWorkScheduler;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,11 +46,14 @@ public class InspectionWizardActivity extends AppCompatActivity {
 
     private long propertyId;
     private String mode;
+    private String firestorePropertyId;
+    private String inspectionId;
 
     private String pendingMediaType = MEDIA_PHOTO;
     private String pendingTag = TAG_WALKTHROUGH;
 
     private AppDatabase db;
+    private FirebaseRepository firebaseRepository;
 
     private TextView textWizardMeta;
     private TextView textWizardProgress;
@@ -65,9 +72,12 @@ public class InspectionWizardActivity extends AppCompatActivity {
         setContentView(R.layout.activity_inspection_wizard);
 
         db = AppDatabase.getInstance(this);
+        firebaseRepository = new FirebaseRepository();
 
         propertyId = getIntent().getLongExtra("propertyId", -1L);
         mode = getIntent().getStringExtra("mode");
+        firestorePropertyId = getIntent().getStringExtra("firestorePropertyId");
+        inspectionId = getIntent().getStringExtra("inspectionId");
         if (mode == null || mode.trim().isEmpty()) {
             mode = getString(R.string.wizard_default_mode);
         }
@@ -286,7 +296,7 @@ public class InspectionWizardActivity extends AppCompatActivity {
         refreshUi();
     }
 
-    private void insertMedia(
+    private RoomItemMedia insertMedia(
             Step step,
             String filePath,
             long ts,
@@ -306,7 +316,86 @@ public class InspectionWizardActivity extends AppCompatActivity {
         media.fileBytes = EvidenceFileUtil.sizeBytes(filePath);
         media.mimeType = EvidenceFileUtil.detectMimeType(filePath, MEDIA_VIDEO.equals(mediaType) ? "video/mp4" : "image/jpeg");
         media.capturedAtIso = EvidenceFileUtil.isoTimestamp(ts);
-        db.mediaDao().insert(media);
+        media.firestorePropertyId = firestorePropertyId;
+        media.firestoreInspectionId = inspectionId;
+        media.pendingUpload = shouldSyncMedia(filePath) ? 1 : 0;
+        media.uploadError = null;
+        long mediaId = db.mediaDao().insert(media);
+        media.id = mediaId;
+
+        if (shouldSyncMedia(filePath) && hasSyncSession()) {
+            uploadMedia(media);
+        } else if (shouldSyncMedia(filePath)) {
+            SyncWorkScheduler.enqueueMediaSync(this);
+        }
+        return media;
+    }
+
+    private boolean hasSyncSession() {
+        return firestorePropertyId != null && !firestorePropertyId.trim().isEmpty()
+                && inspectionId != null && !inspectionId.trim().isEmpty();
+    }
+
+    private boolean shouldSyncMedia(String filePath) {
+        return filePath != null && !filePath.trim().isEmpty();
+    }
+
+    private void uploadMedia(RoomItemMedia media) {
+        String localPath = media.filePath == null || media.filePath.isEmpty() ? media.mediaPath : media.filePath;
+        File localFile = new File(localPath);
+        if (!localFile.exists()) {
+            media.pendingUpload = 1;
+            media.uploadError = "File not found";
+            db.mediaDao().updateMedia(media);
+            return;
+        }
+
+        String storagePath = "captures/" + firestorePropertyId + "/" + inspectionId + "/" + mode + "/" + media.id + "_" + localFile.getName();
+        StorageReference storageRef = FirebaseStorage.getInstance().getReference().child(storagePath);
+        storageRef.putFile(Uri.fromFile(localFile))
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful() && task.getException() != null) {
+                        throw task.getException();
+                    }
+                    return storageRef.getDownloadUrl();
+                })
+                .addOnSuccessListener(uri -> {
+                    FirebaseRepository.MediaInput mediaInput = new FirebaseRepository.MediaInput();
+                    mediaInput.roomName = media.room;
+                    mediaInput.itemName = media.item;
+                    mediaInput.type = media.mediaType;
+                    mediaInput.storagePath = storagePath;
+                    mediaInput.downloadUrl = uri.toString();
+                    mediaInput.sha256 = media.sha256;
+                    mediaInput.notes = media.note;
+                    mediaInput.tags = new ArrayList<>();
+                    mediaInput.tags.add(media.tag);
+
+                    firebaseRepository.addMediaRecord(firestorePropertyId, inspectionId, mediaInput, new FirebaseRepository.RepoCallback<String>() {
+                        @Override
+                        public void onSuccess(String result) {
+                            media.pendingUpload = 0;
+                            media.uploadError = null;
+                            media.firestoreStoragePath = storagePath;
+                            media.firestoreDownloadUrl = uri.toString();
+                            db.mediaDao().updateMedia(media);
+                        }
+
+                        @Override
+                        public void onError(Exception exception) {
+                            media.pendingUpload = 1;
+                            media.uploadError = exception.getMessage();
+                            db.mediaDao().updateMedia(media);
+                            SyncWorkScheduler.enqueueMediaSync(InspectionWizardActivity.this);
+                        }
+                    });
+                })
+                .addOnFailureListener(exception -> {
+                    media.pendingUpload = 1;
+                    media.uploadError = exception.getMessage();
+                    db.mediaDao().updateMedia(media);
+                    SyncWorkScheduler.enqueueMediaSync(InspectionWizardActivity.this);
+                });
     }
 
     private File buildCaptureFile(Step step, long timestamp, String extension) {

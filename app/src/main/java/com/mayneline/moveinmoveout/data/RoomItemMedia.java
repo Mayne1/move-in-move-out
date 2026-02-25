@@ -47,11 +47,18 @@ public class RoomItemMedia {
     public long fileBytes;
     public String mimeType;
     public String capturedAtIso;
+    public int pendingUpload;
+    public String firestorePropertyId;
+    public String firestoreInspectionId;
+    public String firestoreStoragePath;
+    public String firestoreDownloadUrl;
+    public String uploadError;
 
     public RoomItemMedia() {
         this.mediaType = "PHOTO";
         this.tag = "WALKTHROUGH";
         this.videoTimestampMs = 0L;
+        this.pendingUpload = 0;
     }
 
     @Ignore

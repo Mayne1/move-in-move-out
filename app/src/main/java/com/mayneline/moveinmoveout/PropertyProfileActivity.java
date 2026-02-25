@@ -17,6 +17,7 @@ import com.mayneline.moveinmoveout.data.PropertyProfile;
 import com.mayneline.moveinmoveout.data.PropertyRoom;
 import com.mayneline.moveinmoveout.data.RoomItem;
 import com.mayneline.moveinmoveout.engine.PropertyChecklistGenerator;
+import com.mayneline.moveinmoveout.firebase.FirebaseRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,7 @@ public class PropertyProfileActivity extends AppCompatActivity {
 
     private AppDatabase db;
     private String mode;
+    private FirebaseRepository firebaseRepository;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +45,7 @@ public class PropertyProfileActivity extends AppCompatActivity {
         setContentView(R.layout.activity_property_profile);
 
         db = AppDatabase.getInstance(this);
+        firebaseRepository = new FirebaseRepository();
         mode = getIntent().getStringExtra("mode");
         if (mode == null || mode.trim().isEmpty()) {
             mode = "MOVE_IN";
@@ -131,13 +134,54 @@ public class PropertyProfileActivity extends AppCompatActivity {
         }
         db.roomItemDao().insertItems(itemsToInsert);
 
-        textPropertyStatus.setText("Saved property #" + propertyId + " and generated " + roomNames.size() + " rooms.");
+        textPropertyStatus.setText("Saved locally. Creating cloud session...");
+        createCloudSessionAndLaunch(propertyId, profile);
+    }
 
-        Intent intent = new Intent(this, InspectionWizardActivity.class);
-        intent.putExtra("propertyId", propertyId);
-        intent.putExtra("mode", mode);
-        startActivity(intent);
-        finish();
+    private void createCloudSessionAndLaunch(long localPropertyId, PropertyProfile profile) {
+        FirebaseRepository.PropertyInput input = new FirebaseRepository.PropertyInput();
+        input.addressLine = profile.addressLine1;
+        input.unit = "";
+        input.city = profile.city;
+        input.state = profile.state;
+        input.zip = profile.zip;
+
+        firebaseRepository.createProperty(input, new FirebaseRepository.RepoCallback<String>() {
+            @Override
+            public void onSuccess(String remotePropertyId) {
+                firebaseRepository.createInspection(remotePropertyId, mode, new FirebaseRepository.RepoCallback<String>() {
+                    @Override
+                    public void onSuccess(String inspectionId) {
+                        runOnUiThread(() -> {
+                            textPropertyStatus.setText("Cloud session ready.");
+                            Intent intent = new Intent(PropertyProfileActivity.this, InspectionWizardActivity.class);
+                            intent.putExtra("propertyId", localPropertyId);
+                            intent.putExtra("mode", mode);
+                            intent.putExtra("firestorePropertyId", remotePropertyId);
+                            intent.putExtra("inspectionId", inspectionId);
+                            startActivity(intent);
+                            finish();
+                        });
+                    }
+
+                    @Override
+                    public void onError(Exception exception) {
+                        runOnUiThread(() -> {
+                            textPropertyStatus.setText("Could not create inspection session.");
+                            Toast.makeText(PropertyProfileActivity.this, "Failed to create inspection session in cloud", Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void onError(Exception exception) {
+                runOnUiThread(() -> {
+                    textPropertyStatus.setText("Could not create property in cloud.");
+                    Toast.makeText(PropertyProfileActivity.this, "Failed to create property in cloud", Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     private String normalizeBathrooms(String value) {

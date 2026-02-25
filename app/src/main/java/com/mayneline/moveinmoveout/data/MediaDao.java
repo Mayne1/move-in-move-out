@@ -101,4 +101,7 @@ public interface MediaDao {
 
     @Query("SELECT * FROM room_item_media WHERE mode = 'MOVE_OUT' AND room = :room AND item = :item ORDER BY timestamp DESC LIMIT 1")
     RoomItemMedia getMoveOutMedia(String room, String item);
+
+    @Query("SELECT * FROM room_item_media WHERE pendingUpload = 1 ORDER BY timestamp ASC")
+    List<RoomItemMedia> getPendingUploads();
 }

@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase;
                 PropertyRoom.class,
                 RoomItem.class
         },
-        version = 6,
+        version = 7,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
