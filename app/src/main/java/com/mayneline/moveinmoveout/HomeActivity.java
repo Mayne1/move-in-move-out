@@ -7,17 +7,28 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.mayneline.moveinmoveout.data.AppDatabase;
 import com.mayneline.moveinmoveout.data.PropertyProfile;
 
 public class HomeActivity extends AppCompatActivity {
     private AppDatabase db;
+    private FirebaseAuth auth;
+    private FirebaseFirestore firestore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
         db = AppDatabase.getInstance(this);
+        auth = FirebaseAuth.getInstance();
+        firestore = FirebaseFirestore.getInstance();
+
+        if (!ensureAuthAndRole()) {
+            return;
+        }
 
         findViewById(R.id.buttonMoveIn).setOnClickListener(v ->
                 startGuidedFlow("MOVE_IN"));
@@ -35,6 +46,38 @@ public class HomeActivity extends AppCompatActivity {
                 startActivity(new Intent(this, SettingsActivity.class)));
         findViewById(R.id.buttonBuildInfo).setOnClickListener(v ->
                 startActivity(new Intent(this, BuildInfoActivity.class)));
+        findViewById(R.id.buttonAccount).setOnClickListener(v ->
+                startActivity(new Intent(this, AccountActivity.class)));
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ensureAuthAndRole();
+    }
+
+    private boolean ensureAuthAndRole() {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return false;
+        }
+
+        firestore.collection("users")
+                .document(user.getUid())
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    String role = snapshot == null ? null : snapshot.getString("role");
+                    if (role == null || role.trim().isEmpty()) {
+                        Intent intent = new Intent(this, RoleSelectActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }
+                });
+        return true;
     }
 
     private void startGuidedFlow(String mode) {
