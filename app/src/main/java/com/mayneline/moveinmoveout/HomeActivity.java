@@ -36,6 +36,8 @@ public class HomeActivity extends AppCompatActivity {
                 startGuidedFlow("MOVE_OUT"));
         findViewById(R.id.buttonReports).setOnClickListener(v ->
                 startActivity(new Intent(this, ComparisonReportActivity.class)));
+        findViewById(R.id.buttonProperties).setOnClickListener(v ->
+                startActivity(new Intent(this, PropertiesActivity.class)));
         findViewById(R.id.buttonTimeline).setOnClickListener(v ->
                 startActivity(new Intent(this, TimelineActivity.class)));
         findViewById(R.id.buttonRespectFilter).setOnClickListener(v ->

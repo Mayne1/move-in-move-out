@@ -42,6 +42,14 @@
             android:text="Reports" />
 
         <Button
+            android:id="@+id/buttonProperties"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:minHeight="64dp"
+            android:text="Properties" />
+
+        <Button
             android:id="@+id/buttonTimeline"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
