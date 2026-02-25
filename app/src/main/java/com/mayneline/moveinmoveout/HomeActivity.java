@@ -9,15 +9,15 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
 import com.mayneline.moveinmoveout.data.AppDatabase;
 import com.mayneline.moveinmoveout.data.PropertyProfile;
+import com.mayneline.moveinmoveout.session.SessionManager;
 import com.mayneline.moveinmoveout.firebase.SyncWorkScheduler;
 
 public class HomeActivity extends AppCompatActivity {
     private AppDatabase db;
     private FirebaseAuth auth;
-    private FirebaseFirestore firestore;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,7 +25,7 @@ public class HomeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_home);
         db = AppDatabase.getInstance(this);
         auth = FirebaseAuth.getInstance();
-        firestore = FirebaseFirestore.getInstance();
+        sessionManager = SessionManager.getInstance(this);
 
         if (!ensureAuthAndRole()) {
             return;
@@ -63,24 +63,36 @@ public class HomeActivity extends AppCompatActivity {
     private boolean ensureAuthAndRole() {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
+            sessionManager.clearSession("HomeActivity#ensureAuthAndRoleSignedOut");
             Intent intent = new Intent(this, LoginActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
             finish();
             return false;
         }
-
-        firestore.collection("users")
-                .document(user.getUid())
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    String role = snapshot == null ? null : snapshot.getString("role");
-                    if (role == null || role.trim().isEmpty()) {
+        sessionManager.updateUser(user, "HomeActivity#ensureAuthAndRole");
+        String cachedRole = sessionManager.getRole("HomeActivity#cached");
+        if (cachedRole == null || cachedRole.isEmpty()) {
+            sessionManager.loadSession("HomeActivity#initial", role -> {
+                if (role == null || role.trim().isEmpty()) {
+                    runOnUiThread(() -> {
                         Intent intent = new Intent(this, RoleSelectActivity.class);
                         startActivity(intent);
                         finish();
-                    }
-                });
+                    });
+                }
+            });
+        } else {
+            sessionManager.loadSession("HomeActivity#refresh", role -> {
+                if (role == null || role.trim().isEmpty()) {
+                    runOnUiThread(() -> {
+                        Intent intent = new Intent(this, RoleSelectActivity.class);
+                        startActivity(intent);
+                        finish();
+                    });
+                }
+            });
+        }
         return true;
     }
 

@@ -12,6 +12,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.mayneline.moveinmoveout.session.SessionManager;
 
 public class LoginActivity extends AppCompatActivity {
     private EditText editEmail;
@@ -19,6 +20,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private FirebaseAuth auth;
     private FirebaseFirestore firestore;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,6 +29,7 @@ public class LoginActivity extends AppCompatActivity {
 
         auth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
+        sessionManager = SessionManager.getInstance(this);
 
         editEmail = findViewById(R.id.editLoginEmail);
         editPassword = findViewById(R.id.editLoginPassword);
@@ -58,6 +61,7 @@ public class LoginActivity extends AppCompatActivity {
         if (user == null) {
             return;
         }
+        sessionManager.updateUser(user, "LoginActivity#routeAfterAuth");
 
         firestore.collection("users")
                 .document(user.getUid())
@@ -72,6 +76,8 @@ public class LoginActivity extends AppCompatActivity {
             finish();
             return;
         }
+        String role = snapshot.getString("role");
+        sessionManager.setRole(role, "LoginActivity#routeFromUserDoc");
 
         startActivity(new Intent(this, HomeActivity.class));
         finish();

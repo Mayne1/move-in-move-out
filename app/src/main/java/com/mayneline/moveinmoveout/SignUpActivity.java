@@ -9,6 +9,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.mayneline.moveinmoveout.session.SessionManager;
 
 public class SignUpActivity extends AppCompatActivity {
     private EditText editEmail;
@@ -16,6 +17,7 @@ public class SignUpActivity extends AppCompatActivity {
     private EditText editConfirmPassword;
 
     private FirebaseAuth auth;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,6 +25,7 @@ public class SignUpActivity extends AppCompatActivity {
         setContentView(R.layout.activity_sign_up);
 
         auth = FirebaseAuth.getInstance();
+        sessionManager = SessionManager.getInstance(this);
 
         editEmail = findViewById(R.id.editSignUpEmail);
         editPassword = findViewById(R.id.editSignUpPassword);
@@ -42,6 +45,7 @@ public class SignUpActivity extends AppCompatActivity {
 
         auth.createUserWithEmailAndPassword(email, password)
                 .addOnSuccessListener(result -> {
+                    sessionManager.updateUser(result.getUser(), "SignUpActivity#signUpSuccess");
                     Toast.makeText(this, "Account created", Toast.LENGTH_SHORT).show();
                     Intent intent = new Intent(this, RoleSelectActivity.class);
                     startActivity(intent);

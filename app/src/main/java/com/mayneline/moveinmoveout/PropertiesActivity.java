@@ -16,9 +16,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
 import com.mayneline.moveinmoveout.firebase.FirebaseRepository;
 import com.mayneline.moveinmoveout.firebase.FirestoreProperty;
+import com.mayneline.moveinmoveout.session.SessionManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ import java.util.List;
 public class PropertiesActivity extends AppCompatActivity {
     private FirebaseRepository repository;
     private FirebaseAuth auth;
-    private FirebaseFirestore firestore;
+    private SessionManager sessionManager;
 
     private EditText editAddress;
     private EditText editUnit;
@@ -46,7 +46,7 @@ public class PropertiesActivity extends AppCompatActivity {
 
         repository = new FirebaseRepository();
         auth = FirebaseAuth.getInstance();
-        firestore = FirebaseFirestore.getInstance();
+        sessionManager = SessionManager.getInstance(this);
 
         editAddress = findViewById(R.id.editPropertyAddress);
         editUnit = findViewById(R.id.editPropertyUnit);
@@ -71,42 +71,50 @@ public class PropertiesActivity extends AppCompatActivity {
             textPropertiesStatus.setText("Not signed in");
             return;
         }
+        sessionManager.updateUser(user, "PropertiesActivity#loadProperties");
 
-        firestore.collection("users")
-                .document(user.getUid())
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    String role = snapshot == null ? null : snapshot.getString("role");
-                    if (role == null || role.trim().isEmpty()) {
-                        textPropertiesStatus.setText("Role missing. Complete role selection first.");
-                        return;
+        String cachedRole = sessionManager.getRole("PropertiesActivity#cached");
+        if (cachedRole == null || cachedRole.trim().isEmpty()) {
+            textPropertiesStatus.setText("Loading role...");
+        } else {
+            currentRole = cachedRole;
+            updateCreateFormVisibility();
+        }
+
+        sessionManager.loadSession("PropertiesActivity", role -> runOnUiThread(() -> {
+            if (role == null || role.trim().isEmpty()) {
+                textPropertiesStatus.setText("Role missing. Complete role selection first.");
+                return;
+            }
+            currentRole = role;
+            updateCreateFormVisibility();
+            loadRowsForRole(user.getUid(), role);
+        }));
+    }
+
+    private void loadRowsForRole(String uid, String role) {
+        repository.listPropertiesForUser(uid, role, new FirebaseRepository.RepoCallback<List<FirestoreProperty>>() {
+            @Override
+            public void onSuccess(List<FirestoreProperty> result) {
+                runOnUiThread(() -> {
+                    adapter.setItems(result);
+                    if (result.isEmpty()) {
+                        if ("TENANT".equalsIgnoreCase(role)) {
+                            textPropertiesStatus.setText("No shared properties yet.");
+                        } else {
+                            textPropertiesStatus.setText("No properties yet.");
+                        }
+                    } else {
+                        textPropertiesStatus.setText("Loaded " + result.size() + " properties.");
                     }
-                    currentRole = role;
-                    updateCreateFormVisibility();
-                    repository.listPropertiesForUser(user.getUid(), role, new FirebaseRepository.RepoCallback<List<FirestoreProperty>>() {
-                        @Override
-                        public void onSuccess(List<FirestoreProperty> result) {
-                            runOnUiThread(() -> {
-                                adapter.setItems(result);
-                                if (result.isEmpty()) {
-                                    if ("TENANT".equalsIgnoreCase(role)) {
-                                        textPropertiesStatus.setText("No shared properties yet.");
-                                    } else {
-                                        textPropertiesStatus.setText("No properties yet.");
-                                    }
-                                } else {
-                                    textPropertiesStatus.setText("Loaded " + result.size() + " properties.");
-                                }
-                            });
-                        }
+                });
+            }
 
-                        @Override
-                        public void onError(Exception exception) {
-                            runOnUiThread(() -> textPropertiesStatus.setText("Failed to load properties."));
-                        }
-                    });
-                })
-                .addOnFailureListener(e -> textPropertiesStatus.setText("Failed to load user role."));
+            @Override
+            public void onError(Exception exception) {
+                runOnUiThread(() -> textPropertiesStatus.setText("failed to load rows"));
+            }
+        });
     }
 
     private void updateCreateFormVisibility() {

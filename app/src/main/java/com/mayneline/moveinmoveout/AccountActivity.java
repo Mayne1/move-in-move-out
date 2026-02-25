@@ -9,14 +9,14 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.mayneline.moveinmoveout.session.SessionManager;
 
 public class AccountActivity extends AppCompatActivity {
     private TextView textAccountEmail;
     private TextView textAccountRole;
 
     private FirebaseAuth auth;
-    private FirebaseFirestore firestore;
+    private SessionManager sessionManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,7 +24,7 @@ public class AccountActivity extends AppCompatActivity {
         setContentView(R.layout.activity_account);
 
         auth = FirebaseAuth.getInstance();
-        firestore = FirebaseFirestore.getInstance();
+        sessionManager = SessionManager.getInstance(this);
 
         textAccountEmail = findViewById(R.id.textAccountEmail);
         textAccountRole = findViewById(R.id.textAccountRole);
@@ -37,25 +37,37 @@ public class AccountActivity extends AppCompatActivity {
     private void loadProfile() {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
+            sessionManager.clearSession("AccountActivity#loadProfileSignedOut");
             startActivity(new Intent(this, LoginActivity.class));
             finish();
             return;
         }
 
         textAccountEmail.setText("Email: " + (user.getEmail() == null ? "" : user.getEmail()));
+        sessionManager.updateUser(user, "AccountActivity#loadProfile");
 
-        firestore.collection("users")
-                .document(user.getUid())
-                .get()
-                .addOnSuccessListener(snapshot -> {
-                    String role = snapshot != null ? snapshot.getString("role") : null;
-                    textAccountRole.setText("Role: " + (role == null ? "Not set" : role));
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Failed to load role", Toast.LENGTH_SHORT).show());
+        String cachedRole = sessionManager.getRole("AccountActivity#cached");
+        if (cachedRole == null || cachedRole.isEmpty()) {
+            textAccountRole.setText("Role: Loading...");
+        } else {
+            textAccountRole.setText("Role: " + cachedRole + " (Loading...)");
+        }
+
+        sessionManager.loadSession("AccountActivity", role -> runOnUiThread(() -> {
+            if (role != null && !role.trim().isEmpty()) {
+                textAccountRole.setText("Role: " + role);
+            } else if (auth.getCurrentUser() == null) {
+                textAccountRole.setText("Role: Not set");
+            } else {
+                String keepCached = sessionManager.getRole("AccountActivity#postLoadFallback");
+                textAccountRole.setText("Role: " + (keepCached == null || keepCached.isEmpty() ? "Not set" : keepCached));
+            }
+        }));
     }
 
     private void signOut() {
         auth.signOut();
+        sessionManager.clearSession("AccountActivity#signOut");
         Intent intent = new Intent(this, LoginActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
