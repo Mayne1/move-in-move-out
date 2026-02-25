@@ -355,7 +355,7 @@ public class TimelineActivity extends AppCompatActivity {
     }
 
     private void shareFile(File file) {
-        Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+        Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".file_provider", file);
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("application/pdf");
         shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
