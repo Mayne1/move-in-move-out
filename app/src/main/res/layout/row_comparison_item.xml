@@ -44,13 +44,6 @@
                 android:adjustViewBounds="true"
                 android:background="#D9D9D9"
                 android:scaleType="centerCrop" />
-
-            <TextView
-                android:id="@+id/textMoveInMediaType"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -73,13 +66,6 @@
                 android:adjustViewBounds="true"
                 android:background="#D9D9D9"
                 android:scaleType="centerCrop" />
-
-            <TextView
-                android:id="@+id/textMoveOutMediaType"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 
@@ -87,30 +73,13 @@
         android:id="@+id/textStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:textStyle="bold" />
 
-    <LinearLayout
-        android:id="@+id/layoutDetails"
-        android:layout_width="match_parent"
+    <Button
+        android:id="@+id/buttonDetails"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="#FFFFFF"
-        android:orientation="vertical"
-        android:padding="8dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/textMoveInDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/textMoveOutDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textSize="12sp" />
-    </LinearLayout>
+        android:layout_marginTop="6dp"
+        android:text="Details" />
 </LinearLayout>

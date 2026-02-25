@@ -15,11 +15,13 @@ public class ComparisonRow {
     private final String moveOutSha256;
     private final long moveInFileBytes;
     private final long moveOutFileBytes;
+    private final double similarityScore;
     private final String status;
+    private final String explanation;
     private boolean expanded;
 
     public ComparisonRow(String room, String item, String moveInPath, String moveOutPath, String status) {
-        this(0L, 0L, room, item, moveInPath, moveOutPath, "PHOTO", "PHOTO", "", "", "", "", 0L, 0L, status);
+        this(0L, 0L, room, item, moveInPath, moveOutPath, "PHOTO", "PHOTO", "", "", "", "", 0L, 0L, 0.0, status, "");
     }
 
     public ComparisonRow(
@@ -37,7 +39,9 @@ public class ComparisonRow {
             String moveOutSha256,
             long moveInFileBytes,
             long moveOutFileBytes,
-            String status
+            double similarityScore,
+            String status,
+            String explanation
     ) {
         this.roomId = roomId;
         this.itemId = itemId;
@@ -53,7 +57,9 @@ public class ComparisonRow {
         this.moveOutSha256 = moveOutSha256;
         this.moveInFileBytes = moveInFileBytes;
         this.moveOutFileBytes = moveOutFileBytes;
+        this.similarityScore = similarityScore;
         this.status = status;
+        this.explanation = explanation;
         this.expanded = false;
     }
 
@@ -113,8 +119,16 @@ public class ComparisonRow {
         return moveOutFileBytes;
     }
 
+    public double getSimilarityScore() {
+        return similarityScore;
+    }
+
     public String getStatus() {
         return status;
+    }
+
+    public String getExplanation() {
+        return explanation;
     }
 
     public boolean isExpanded() {

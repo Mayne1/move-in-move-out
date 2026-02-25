@@ -1,8 +1,5 @@
 package com.mayneline.moveinmoveout.ui;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -10,6 +7,7 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -23,10 +21,16 @@ import java.io.File;
 import java.util.List;
 
 public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonReportAdapter.ComparisonViewHolder> {
-    private final List<ComparisonRow> rows;
+    public interface OnDetailsClickListener {
+        void onDetailsClick(ComparisonRow row);
+    }
 
-    public ComparisonReportAdapter(List<ComparisonRow> rows) {
+    private final List<ComparisonRow> rows;
+    private final OnDetailsClickListener detailsClickListener;
+
+    public ComparisonReportAdapter(List<ComparisonRow> rows, OnDetailsClickListener detailsClickListener) {
         this.rows = rows;
+        this.detailsClickListener = detailsClickListener;
     }
 
     @NonNull
@@ -38,7 +42,7 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
 
     @Override
     public void onBindViewHolder(@NonNull ComparisonViewHolder holder, int position) {
-        holder.bind(rows.get(position));
+        holder.bind(rows.get(position), detailsClickListener);
     }
 
     @Override
@@ -51,12 +55,8 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
         private final TextView textItem;
         private final ImageView imageMoveIn;
         private final ImageView imageMoveOut;
-        private final TextView textMoveInMediaType;
-        private final TextView textMoveOutMediaType;
         private final TextView textStatus;
-        private final View layoutDetails;
-        private final TextView textMoveInDetails;
-        private final TextView textMoveOutDetails;
+        private final Button buttonDetails;
 
         ComparisonViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -64,39 +64,25 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             textItem = itemView.findViewById(R.id.textItem);
             imageMoveIn = itemView.findViewById(R.id.imageMoveIn);
             imageMoveOut = itemView.findViewById(R.id.imageMoveOut);
-            textMoveInMediaType = itemView.findViewById(R.id.textMoveInMediaType);
-            textMoveOutMediaType = itemView.findViewById(R.id.textMoveOutMediaType);
             textStatus = itemView.findViewById(R.id.textStatus);
-            layoutDetails = itemView.findViewById(R.id.layoutDetails);
-            textMoveInDetails = itemView.findViewById(R.id.textMoveInDetails);
-            textMoveOutDetails = itemView.findViewById(R.id.textMoveOutDetails);
+            buttonDetails = itemView.findViewById(R.id.buttonDetails);
         }
 
-        void bind(ComparisonRow row) {
+        void bind(ComparisonRow row, OnDetailsClickListener listener) {
             textRoom.setText("Room: " + row.getRoom());
             textItem.setText("Item: " + row.getItem());
-            bindImage(imageMoveIn, textMoveInMediaType, row.getMoveInPath(), row.getMoveInMediaType());
-            bindImage(imageMoveOut, textMoveOutMediaType, row.getMoveOutPath(), row.getMoveOutMediaType());
-            textStatus.setText("Status: " + row.getStatus());
+            bindImage(imageMoveIn, row.getMoveInPath());
+            bindImage(imageMoveOut, row.getMoveOutPath());
+            textStatus.setText("Status: " + displayStatus(row.getStatus()));
             textStatus.setTextColor(statusColor(row.getStatus()));
-
-            textMoveInDetails.setText(formatDetails("Move In", row.getMoveInCapturedAt(), row.getMoveInSha256(), row.getMoveInFileBytes()));
-            textMoveOutDetails.setText(formatDetails("Move Out", row.getMoveOutCapturedAt(), row.getMoveOutSha256(), row.getMoveOutFileBytes()));
-            layoutDetails.setVisibility(row.isExpanded() ? View.VISIBLE : View.GONE);
-
-            textStatus.setOnClickListener(v -> {
-                row.toggleExpanded();
-                layoutDetails.setVisibility(row.isExpanded() ? View.VISIBLE : View.GONE);
+            buttonDetails.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onDetailsClick(row);
+                }
             });
-
-            textMoveInDetails.setOnClickListener(v -> copyHash(v.getContext(), row.getMoveInSha256()));
-            textMoveOutDetails.setOnClickListener(v -> copyHash(v.getContext(), row.getMoveOutSha256()));
         }
 
-        private void bindImage(ImageView imageView, TextView mediaTypeView, String path, String mediaType) {
-            String normalizedType = mediaType == null ? "PHOTO" : mediaType.toUpperCase();
-            mediaTypeView.setText(normalizedType);
-
+        private void bindImage(ImageView imageView, String path) {
             if (TextUtils.isEmpty(path)) {
                 imageView.setImageResource(android.R.drawable.ic_menu_report_image);
                 return;
@@ -108,12 +94,9 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
                 return;
             }
 
-            if ("VIDEO".equals(normalizedType)) {
-                imageView.setImageResource(android.R.drawable.ic_media_play);
-                return;
-            }
-
-            Bitmap bitmap = BitmapFactory.decodeFile(path);
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = 4;
+            Bitmap bitmap = BitmapFactory.decodeFile(path, options);
             if (bitmap != null) {
                 imageView.setImageBitmap(bitmap);
             } else {
@@ -122,32 +105,23 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
         }
 
         private int statusColor(String status) {
-            if ("No Change".equals(status) || "NO_CHANGE".equals(status)) {
+            if ("NO_CHANGE".equals(status)) {
                 return Color.parseColor("#1B5E20");
             }
-            if ("Media Missing".equals(status) || "MISSING".equals(status)) {
+            if ("MEDIA_MISSING".equals(status)) {
                 return Color.parseColor("#B71C1C");
             }
             return Color.parseColor("#E65100");
         }
 
-        private String formatDetails(String label, String capturedAt, String hash, long fileBytes) {
-            String shortHash = hash == null || hash.isEmpty() ? "-" : hash.substring(0, Math.min(10, hash.length()));
-            return label
-                    + " | Time: " + (capturedAt == null || capturedAt.isEmpty() ? "-" : capturedAt)
-                    + " | Hash: " + shortHash
-                    + " | Size: " + fileBytes + " bytes";
-        }
-
-        private void copyHash(Context context, String hash) {
-            if (hash == null || hash.isEmpty()) {
-                return;
+        private String displayStatus(String status) {
+            if ("MEDIA_MISSING".equals(status)) {
+                return "Media Missing";
             }
-            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard == null) {
-                return;
+            if ("NO_CHANGE".equals(status)) {
+                return "No Change";
             }
-            clipboard.setPrimaryClip(ClipData.newPlainText("sha256", hash));
+            return "Needs Review";
         }
     }
 }

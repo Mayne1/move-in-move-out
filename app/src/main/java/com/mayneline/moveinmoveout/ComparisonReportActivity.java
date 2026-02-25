@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
@@ -12,15 +13,8 @@ import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.mayneline.moveinmoveout.data.AppDatabase;
-import com.mayneline.moveinmoveout.data.PropertyProfile;
-import com.mayneline.moveinmoveout.data.PropertyRoom;
-import com.mayneline.moveinmoveout.data.RoomItem;
-import com.mayneline.moveinmoveout.data.RoomItemMedia;
-import com.mayneline.moveinmoveout.engine.EvidenceFileUtil;
-import com.mayneline.moveinmoveout.engine.HashUtils;
+import com.mayneline.moveinmoveout.engine.ComparisonService;
 import com.mayneline.moveinmoveout.model.ComparisonRow;
-import com.mayneline.moveinmoveout.report.EvidenceManifestWriter;
 import com.mayneline.moveinmoveout.report.PdfReportExporter;
 import com.mayneline.moveinmoveout.report.ReportComparisonItem;
 import com.mayneline.moveinmoveout.ui.ComparisonReportAdapter;
@@ -30,13 +24,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ComparisonReportActivity extends AppCompatActivity {
-    private static final String MODE_MOVE_IN = "MOVE_IN";
-    private static final String MODE_MOVE_OUT = "MOVE_OUT";
-    private static final String STATUS_MISSING = "Media Missing";
-    private static final String STATUS_NO_CHANGE = "No Change";
-    private static final String STATUS_NEEDS_REVIEW = "Needs Review";
+    private static final String STATUS_MEDIA_MISSING = "MEDIA_MISSING";
+    private static final String STATUS_NO_CHANGE = "NO_CHANGE";
+    private static final String STATUS_NEEDS_REVIEW = "NEEDS_REVIEW";
 
     private static final int FILTER_ALL = 0;
     private static final int FILTER_MISSING = 1;
@@ -48,27 +42,29 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private static final int SCOPE_SELECTED_ITEMS = 2;
 
     private RecyclerView recyclerComparison;
-    private android.widget.TextView textEmpty;
-    private android.widget.TextView textSummary;
-    private android.widget.TextView textScope;
+    private TextView textEmpty;
+    private TextView textSummary;
+    private TextView textScope;
 
-    private AppDatabase db;
-    private PropertyProfile property;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     private int activeFilter = FILTER_ALL;
     private int activeScope = SCOPE_WHOLE_PROPERTY;
-    private final Set<Long> selectedRoomIds = new LinkedHashSet<>();
-    private final Set<Long> selectedItemIds = new LinkedHashSet<>();
+    private final Set<String> selectedRooms = new LinkedHashSet<>();
+    private final Set<String> selectedItems = new LinkedHashSet<>();
     private List<ComparisonRow> allRows = new ArrayList<>();
 
-    private File lastExportedPdf;
+    private String propertyAddress = "";
+    private String moveInInspectionTime = "";
+    private String moveOutInspectionTime = "";
+    private String firestorePropertyId = "";
+    private int totalMoveInEntries;
+    private int totalMoveOutEntries;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_comparison_report);
-
-        db = AppDatabase.getInstance(this);
 
         recyclerComparison = findViewById(R.id.recyclerComparison);
         textEmpty = findViewById(R.id.textEmpty);
@@ -77,94 +73,109 @@ public class ComparisonReportActivity extends AppCompatActivity {
 
         recyclerComparison.setLayoutManager(new LinearLayoutManager(this));
         findViewById(R.id.buttonRefreshComparison).setOnClickListener(v -> loadComparisonRows());
-        findViewById(R.id.buttonSeedDemoPair).setOnClickListener(v -> seedDemoPair());
+        findViewById(R.id.buttonSeedDemoPair).setVisibility(View.GONE);
         findViewById(R.id.buttonFilterAll).setOnClickListener(v -> setFilter(FILTER_ALL));
         findViewById(R.id.buttonFilterMissing).setOnClickListener(v -> setFilter(FILTER_MISSING));
         findViewById(R.id.buttonFilterNeedsReview).setOnClickListener(v -> setFilter(FILTER_NEEDS_REVIEW));
         findViewById(R.id.buttonFilterNoChange).setOnClickListener(v -> setFilter(FILTER_NO_CHANGE));
+        findViewById(R.id.buttonFilterChangeDetected).setVisibility(View.GONE);
         findViewById(R.id.buttonSelectScope).setOnClickListener(v -> showScopeModeDialog());
         findViewById(R.id.buttonExportPdf).setOnClickListener(v -> exportAndShareReport());
 
         loadComparisonRows();
     }
 
-    private void loadComparisonRows() {
-        long propertyId = getIntent().getLongExtra("propertyProfileId", -1L);
-        property = propertyId > 0 ? db.propertyDao().getPropertyById(propertyId) : db.propertyDao().getLatestProperty();
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
+    }
 
-        if (property == null) {
-            textSummary.setText("No property found.");
-            recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>()));
+    private void loadComparisonRows() {
+        firestorePropertyId = safe(getIntent().getStringExtra("firestorePropertyId"));
+        if (firestorePropertyId.isEmpty()) {
+            textSummary.setText("Open this report from Properties to load cloud comparison data.");
+            recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails));
             textEmpty.setVisibility(View.VISIBLE);
             return;
         }
 
-        List<PropertyRoom> rooms = db.propertyRoomDao().getRoomsForProperty(property.id);
-        List<ComparisonRow> rows = new ArrayList<>();
+        textSummary.setText("Loading cloud comparison...");
+        executor.execute(() -> {
+            try {
+                ComparisonService service = new ComparisonService();
+                File cacheRoot = new File(getFilesDir(), "cloud_media_cache");
+                ComparisonService.FirestoreComparisonData data = service.loadPropertyComparison(firestorePropertyId, cacheRoot);
 
-        int missingCount = 0;
-        int noChangeCount = 0;
-        int needsReviewCount = 0;
-
-        for (PropertyRoom room : rooms) {
-            List<RoomItem> items = db.roomItemDao().getItemsForRoom(room.id);
-            for (RoomItem item : items) {
-                RoomItemMedia moveIn = resolvePrimaryMedia(property.id, room, item, MODE_MOVE_IN);
-                RoomItemMedia moveOut = resolvePrimaryMedia(property.id, room, item, MODE_MOVE_OUT);
-
-                String status = statusFor(moveIn, moveOut);
-                if (STATUS_MISSING.equals(status)) {
-                    missingCount++;
-                } else if (STATUS_NO_CHANGE.equals(status)) {
-                    noChangeCount++;
-                } else {
-                    needsReviewCount++;
+                List<ComparisonRow> rows = new ArrayList<>();
+                for (ComparisonService.FirestoreComparisonRow row : data.rows) {
+                    rows.add(new ComparisonRow(
+                            0L,
+                            0L,
+                            row.roomName,
+                            row.itemName,
+                            row.moveInPath,
+                            row.moveOutPath,
+                            "PHOTO",
+                            "PHOTO",
+                            row.moveInCapturedAt,
+                            row.moveOutCapturedAt,
+                            row.moveInSha256,
+                            row.moveOutSha256,
+                            row.moveInFileBytes,
+                            row.moveOutFileBytes,
+                            row.similarityScore,
+                            row.status,
+                            row.explanation
+                    ));
                 }
 
-                rows.add(new ComparisonRow(
-                        room.id,
-                        item.id,
-                        room.name,
-                        item.name,
-                        moveIn == null ? "" : bestPath(moveIn),
-                        moveOut == null ? "" : bestPath(moveOut),
-                        mediaType(moveIn),
-                        mediaType(moveOut),
-                        captureTime(moveIn),
-                        captureTime(moveOut),
-                        mediaHash(moveIn),
-                        mediaHash(moveOut),
-                        fileBytes(moveIn),
-                        fileBytes(moveOut),
-                        status
-                ));
+                runOnUiThread(() -> {
+                    propertyAddress = data.propertyAddress;
+                    moveInInspectionTime = data.moveInInspectionCreatedAt;
+                    moveOutInspectionTime = data.moveOutInspectionCreatedAt;
+                    totalMoveInEntries = data.totalMoveInEntries;
+                    totalMoveOutEntries = data.totalMoveOutEntries;
+                    allRows = rows;
+                    applyFilter();
+                    updateScopeLabel();
+                    updateSummaryText();
+                });
+            } catch (Exception exception) {
+                runOnUiThread(() -> {
+                    textSummary.setText("Failed to load cloud comparison data.");
+                    recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails));
+                    textEmpty.setVisibility(View.VISIBLE);
+                });
             }
-        }
+        });
+    }
 
-        int moveInCount = db.mediaDao().getAllMoveInForProperty(property.id).size();
-        int moveOutCount = db.mediaDao().getAllMoveOutForProperty(property.id).size();
-
-        textSummary.setText(
-                "Property: " + property.addressLine1 + ", " + property.city + ", " + property.state + " " + property.zip
-                        + "\nMove-In entries: " + moveInCount
-                        + " | Move-Out entries: " + moveOutCount
-                        + "\nMissing: " + missingCount + " | No Change: " + noChangeCount + " | Needs Review: " + needsReviewCount
-        );
-
-        allRows = rows;
-        applyFilter();
-        updateScopeLabel();
+    private void openDetails(ComparisonRow row) {
+        Intent intent = new Intent(this, ComparisonDetailsActivity.class);
+        intent.putExtra("room", row.getRoom());
+        intent.putExtra("item", row.getItem());
+        intent.putExtra("moveInPath", row.getMoveInPath());
+        intent.putExtra("moveOutPath", row.getMoveOutPath());
+        intent.putExtra("status", row.getStatus());
+        intent.putExtra("explanation", row.getExplanation());
+        intent.putExtra("similarity", row.getSimilarityScore());
+        startActivity(intent);
     }
 
     private void setFilter(int filter) {
         activeFilter = filter;
         applyFilter();
+        updateSummaryText();
     }
 
     private void applyFilter() {
         List<ComparisonRow> filtered = new ArrayList<>();
         for (ComparisonRow row : allRows) {
-            if (activeFilter == FILTER_MISSING && !STATUS_MISSING.equals(row.getStatus())) {
+            if (!isIncludedByScope(row)) {
+                continue;
+            }
+            if (activeFilter == FILTER_MISSING && !STATUS_MEDIA_MISSING.equals(row.getStatus())) {
                 continue;
             }
             if (activeFilter == FILTER_NEEDS_REVIEW && !STATUS_NEEDS_REVIEW.equals(row.getStatus())) {
@@ -175,84 +186,36 @@ public class ComparisonReportActivity extends AppCompatActivity {
             }
             filtered.add(row);
         }
-        recyclerComparison.setAdapter(new ComparisonReportAdapter(filtered));
+        recyclerComparison.setAdapter(new ComparisonReportAdapter(filtered, this::openDetails));
         textEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
-    private RoomItemMedia resolvePrimaryMedia(long propertyId, PropertyRoom room, RoomItem item, String mode) {
-        RoomItemMedia media = db.mediaDao().getPrimaryMediaForRoomItemMode(propertyId, item.id, mode);
-        if (media != null) {
-            return media;
-        }
-        media = db.mediaDao().getPrimaryForRoomItemTextMode(propertyId, mode, room.name, item.name);
-        if (media != null) {
-            return media;
-        }
-        return db.mediaDao().getPrimaryForRoomItemTextModeFallback(propertyId, String.valueOf(propertyId), mode, room.name, item.name);
-    }
+    private void updateSummaryText() {
+        int missing = 0;
+        int noChange = 0;
+        int needsReview = 0;
 
-    private String statusFor(RoomItemMedia moveIn, RoomItemMedia moveOut) {
-        if (moveIn == null || moveOut == null) {
-            return STATUS_MISSING;
+        for (ComparisonRow row : allRows) {
+            if (!isIncludedByScope(row)) {
+                continue;
+            }
+            if (STATUS_MEDIA_MISSING.equals(row.getStatus())) {
+                missing++;
+            } else if (STATUS_NO_CHANGE.equals(row.getStatus())) {
+                noChange++;
+            } else {
+                needsReview++;
+            }
         }
 
-        String hashIn = mediaHash(moveIn);
-        String hashOut = mediaHash(moveOut);
-        if (!hashIn.isEmpty() && hashIn.equals(hashOut)) {
-            return STATUS_NO_CHANGE;
-        }
-        return STATUS_NEEDS_REVIEW;
-    }
-
-    private String bestPath(RoomItemMedia media) {
-        if (media == null) {
-            return "";
-        }
-        if (media.filePath != null && !media.filePath.isEmpty()) {
-            return media.filePath;
-        }
-        return media.mediaPath == null ? "" : media.mediaPath;
-    }
-
-    private String mediaHash(RoomItemMedia media) {
-        if (media == null) {
-            return "";
-        }
-        if (media.sha256 != null && !media.sha256.isEmpty()) {
-            return media.sha256;
-        }
-        if (media.mediaSha256 != null && !media.mediaSha256.isEmpty()) {
-            return media.mediaSha256;
-        }
-        String path = bestPath(media);
-        return path.isEmpty() ? "" : HashUtils.sha256File(path);
-    }
-
-    private long fileBytes(RoomItemMedia media) {
-        if (media == null) {
-            return 0L;
-        }
-        if (media.fileBytes > 0) {
-            return media.fileBytes;
-        }
-        return EvidenceFileUtil.sizeBytes(bestPath(media));
-    }
-
-    private String captureTime(RoomItemMedia media) {
-        if (media == null) {
-            return "";
-        }
-        if (media.capturedAtIso != null && !media.capturedAtIso.isEmpty()) {
-            return media.capturedAtIso;
-        }
-        return media.timestamp > 0 ? EvidenceFileUtil.isoTimestamp(media.timestamp) : "";
-    }
-
-    private String mediaType(RoomItemMedia media) {
-        if (media == null || media.mediaType == null || media.mediaType.isEmpty()) {
-            return "PHOTO";
-        }
-        return media.mediaType.toUpperCase();
+        textSummary.setText(
+                "Property: " + propertyAddress
+                        + "\nMove-In entries: " + totalMoveInEntries
+                        + " | Move-Out entries: " + totalMoveOutEntries
+                        + "\nMissing: " + missing
+                        + " | No Change: " + noChange
+                        + " | Needs Review: " + needsReview
+        );
     }
 
     private void showScopeModeDialog() {
@@ -267,66 +230,77 @@ public class ComparisonReportActivity extends AppCompatActivity {
                     } else if (activeScope == SCOPE_SELECTED_ITEMS) {
                         chooseItems();
                     } else {
-                        selectedRoomIds.clear();
-                        selectedItemIds.clear();
+                        selectedRooms.clear();
+                        selectedItems.clear();
                         updateScopeLabel();
+                        applyFilter();
+                        updateSummaryText();
                     }
                 })
                 .show();
     }
 
     private void chooseRooms() {
-        if (property == null) {
-            return;
+        List<String> roomOptions = new ArrayList<>();
+        for (ComparisonRow row : allRows) {
+            if (!roomOptions.contains(row.getRoom())) {
+                roomOptions.add(row.getRoom());
+            }
         }
-        List<PropertyRoom> rooms = db.propertyRoomDao().getRoomsForProperty(property.id);
-        String[] labels = new String[rooms.size()];
-        boolean[] checked = new boolean[rooms.size()];
 
-        for (int i = 0; i < rooms.size(); i++) {
-            labels[i] = rooms.get(i).name;
-            checked[i] = selectedRoomIds.contains(rooms.get(i).id);
+        String[] labels = roomOptions.toArray(new String[0]);
+        boolean[] checked = new boolean[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            checked[i] = selectedRooms.contains(labels[i]);
         }
 
         new AlertDialog.Builder(this)
                 .setTitle("Select rooms")
                 .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> {
-                    long id = rooms.get(which).id;
                     if (isChecked) {
-                        selectedRoomIds.add(id);
+                        selectedRooms.add(labels[which]);
                     } else {
-                        selectedRoomIds.remove(id);
+                        selectedRooms.remove(labels[which]);
                     }
                 })
-                .setPositiveButton("Done", (dialog, which) -> updateScopeLabel())
+                .setPositiveButton("Done", (dialog, which) -> {
+                    updateScopeLabel();
+                    applyFilter();
+                    updateSummaryText();
+                })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
     private void chooseItems() {
-        if (property == null) {
-            return;
+        List<String> itemOptions = new ArrayList<>();
+        for (ComparisonRow row : allRows) {
+            String key = row.getRoom() + " - " + row.getItem();
+            if (!itemOptions.contains(key)) {
+                itemOptions.add(key);
+            }
         }
-        List<RoomItem> items = db.roomItemDao().getItemsForProperty(property.id);
-        String[] labels = new String[items.size()];
-        boolean[] checked = new boolean[items.size()];
 
-        for (int i = 0; i < items.size(); i++) {
-            labels[i] = items.get(i).name + " (#" + items.get(i).id + ")";
-            checked[i] = selectedItemIds.contains(items.get(i).id);
+        String[] labels = itemOptions.toArray(new String[0]);
+        boolean[] checked = new boolean[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            checked[i] = selectedItems.contains(labels[i]);
         }
 
         new AlertDialog.Builder(this)
                 .setTitle("Select items")
                 .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> {
-                    long id = items.get(which).id;
                     if (isChecked) {
-                        selectedItemIds.add(id);
+                        selectedItems.add(labels[which]);
                     } else {
-                        selectedItemIds.remove(id);
+                        selectedItems.remove(labels[which]);
                     }
                 })
-                .setPositiveButton("Done", (dialog, which) -> updateScopeLabel())
+                .setPositiveButton("Done", (dialog, which) -> {
+                    updateScopeLabel();
+                    applyFilter();
+                    updateSummaryText();
+                })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -335,15 +309,15 @@ public class ComparisonReportActivity extends AppCompatActivity {
         if (activeScope == SCOPE_WHOLE_PROPERTY) {
             textScope.setText("Scope: Whole property");
         } else if (activeScope == SCOPE_SELECTED_ROOMS) {
-            textScope.setText("Scope: " + selectedRoomIds.size() + " room(s)");
+            textScope.setText("Scope: " + selectedRooms.size() + " room(s)");
         } else {
-            textScope.setText("Scope: " + selectedItemIds.size() + " item(s)");
+            textScope.setText("Scope: " + selectedItems.size() + " item(s)");
         }
     }
 
     private void exportAndShareReport() {
-        if (property == null) {
-            Toast.makeText(this, "No property available", Toast.LENGTH_SHORT).show();
+        if (allRows.isEmpty()) {
+            Toast.makeText(this, "No rows available", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -356,6 +330,9 @@ public class ComparisonReportActivity extends AppCompatActivity {
             if (!isIncludedByScope(row)) {
                 continue;
             }
+            if (!isIncludedByActiveFilter(row)) {
+                continue;
+            }
 
             ReportComparisonItem item = new ReportComparisonItem();
             item.roomId = row.getRoomId();
@@ -363,6 +340,8 @@ public class ComparisonReportActivity extends AppCompatActivity {
             item.roomName = row.getRoom();
             item.itemName = row.getItem();
             item.status = row.getStatus();
+            item.similarityScore = row.getSimilarityScore();
+            item.explanation = row.getExplanation();
             item.moveInPath = row.getMoveInPath();
             item.moveInCapturedAt = row.getMoveInCapturedAt();
             item.moveInSha256 = row.getMoveInSha256();
@@ -373,7 +352,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
             item.moveOutFileBytes = row.getMoveOutFileBytes();
             exportItems.add(item);
 
-            if (STATUS_MISSING.equals(item.status)) {
+            if (STATUS_MEDIA_MISSING.equals(item.status)) {
                 missing++;
             } else if (STATUS_NO_CHANGE.equals(item.status)) {
                 noChange++;
@@ -383,20 +362,29 @@ public class ComparisonReportActivity extends AppCompatActivity {
         }
 
         if (exportItems.isEmpty()) {
-            Toast.makeText(this, "No rows in current scope", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No rows in current filter/scope", Toast.LENGTH_SHORT).show();
             return;
         }
 
         File outputDir = new File(getFilesDir(), "exports");
         try {
             PdfReportExporter pdfExporter = new PdfReportExporter();
-            lastExportedPdf = pdfExporter.export(this, property, exportItems, missing, needsReview, noChange, outputDir);
+            File pdfFile = pdfExporter.export(
+                    this,
+                    propertyAddress,
+                    moveInInspectionTime,
+                    moveOutInspectionTime,
+                    exportItems,
+                    totalMoveInEntries,
+                    totalMoveOutEntries,
+                    missing,
+                    needsReview,
+                    noChange,
+                    outputDir
+            );
 
-            EvidenceManifestWriter manifestWriter = new EvidenceManifestWriter();
-            File manifestFile = manifestWriter.writeManifest(this, property, exportItems, outputDir);
-
-            Toast.makeText(this, "Exported: " + lastExportedPdf.getName() + " and " + manifestFile.getName(), Toast.LENGTH_LONG).show();
-            shareFile(lastExportedPdf);
+            Toast.makeText(this, "Exported: " + pdfFile.getName(), Toast.LENGTH_LONG).show();
+            shareFile(pdfFile);
         } catch (Exception exception) {
             Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show();
         }
@@ -407,9 +395,23 @@ public class ComparisonReportActivity extends AppCompatActivity {
             return true;
         }
         if (activeScope == SCOPE_SELECTED_ROOMS) {
-            return selectedRoomIds.isEmpty() || selectedRoomIds.contains(row.getRoomId());
+            return selectedRooms.isEmpty() || selectedRooms.contains(row.getRoom());
         }
-        return selectedItemIds.isEmpty() || selectedItemIds.contains(row.getItemId());
+        String key = row.getRoom() + " - " + row.getItem();
+        return selectedItems.isEmpty() || selectedItems.contains(key);
+    }
+
+    private boolean isIncludedByActiveFilter(ComparisonRow row) {
+        if (activeFilter == FILTER_ALL) {
+            return true;
+        }
+        if (activeFilter == FILTER_MISSING) {
+            return STATUS_MEDIA_MISSING.equals(row.getStatus());
+        }
+        if (activeFilter == FILTER_NEEDS_REVIEW) {
+            return STATUS_NEEDS_REVIEW.equals(row.getStatus());
+        }
+        return STATUS_NO_CHANGE.equals(row.getStatus());
     }
 
     private void shareFile(File file) {
@@ -426,96 +428,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(shareIntent, "Share report"));
     }
 
-    private void seedDemoPair() {
-        if (property == null) {
-            Toast.makeText(this, "No property available to seed", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        List<PropertyRoom> rooms = db.propertyRoomDao().getRoomsForProperty(property.id);
-        if (rooms.isEmpty()) {
-            Toast.makeText(this, "No generated rooms found", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        PropertyRoom room = rooms.get(0);
-        List<RoomItem> items = db.roomItemDao().getItemsForRoom(room.id);
-        if (items.isEmpty()) {
-            Toast.makeText(this, "No generated items found", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        RoomItem item = items.get(0);
-        long now = System.currentTimeMillis();
-
-        File moveInFile = createDemoImageFile(property.id, MODE_MOVE_IN, room.id, item.id, now, "Move In");
-        File moveOutFile = createDemoImageFile(property.id, MODE_MOVE_OUT, room.id, item.id, now + 1, "Move Out");
-
-        if (moveInFile == null || moveOutFile == null) {
-            Toast.makeText(this, "Failed to seed demo files", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        RoomItemMedia moveIn = new RoomItemMedia(MODE_MOVE_IN, room.name, item.name, moveInFile.getAbsolutePath(), now, "PHOTO", "WALKTHROUGH", null, 0L);
-        moveIn.applyPropertyLinks(property.id, room.id, item.id);
-        moveIn.propertyId = String.valueOf(property.id);
-        moveIn.roomId = room.name;
-        moveIn.itemId = item.name;
-        moveIn.mediaPath = moveInFile.getAbsolutePath();
-        moveIn.sha256 = HashUtils.sha256File(moveIn.mediaPath);
-        moveIn.mediaSha256 = moveIn.sha256;
-        moveIn.fileBytes = EvidenceFileUtil.sizeBytes(moveIn.mediaPath);
-        moveIn.mimeType = "image/jpeg";
-        moveIn.capturedAtIso = EvidenceFileUtil.isoTimestamp(now);
-
-        RoomItemMedia moveOut = new RoomItemMedia(MODE_MOVE_OUT, room.name, item.name, moveOutFile.getAbsolutePath(), now + 1, "PHOTO", "WALKTHROUGH", null, 0L);
-        moveOut.applyPropertyLinks(property.id, room.id, item.id);
-        moveOut.propertyId = String.valueOf(property.id);
-        moveOut.roomId = room.name;
-        moveOut.itemId = item.name;
-        moveOut.mediaPath = moveOutFile.getAbsolutePath();
-        moveOut.sha256 = HashUtils.sha256File(moveOut.mediaPath);
-        moveOut.mediaSha256 = moveOut.sha256;
-        moveOut.fileBytes = EvidenceFileUtil.sizeBytes(moveOut.mediaPath);
-        moveOut.mimeType = "image/jpeg";
-        moveOut.capturedAtIso = EvidenceFileUtil.isoTimestamp(now + 1);
-
-        db.mediaDao().insert(moveIn);
-        db.mediaDao().insert(moveOut);
-
-        Toast.makeText(this, "Seeded demo move-in/out pair", Toast.LENGTH_SHORT).show();
-        loadComparisonRows();
-    }
-
-    private File createDemoImageFile(long propertyId, String mode, long roomId, long itemId, long timestamp, String label) {
-        try {
-            File dir = new File(getFilesDir(), "captures/" + propertyId + "/" + mode);
-            if (!dir.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                dir.mkdirs();
-            }
-
-            File outFile = new File(dir, roomId + "_" + itemId + "_demo_" + timestamp + ".jpg");
-
-            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(960, 540, android.graphics.Bitmap.Config.ARGB_8888);
-            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
-            android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-            paint.setColor("MOVE_IN".equals(mode) ? android.graphics.Color.parseColor("#DFF4FF") : android.graphics.Color.parseColor("#FFE7D6"));
-            canvas.drawRect(0, 0, bitmap.getWidth(), bitmap.getHeight(), paint);
-            paint.setColor(android.graphics.Color.parseColor("#202020"));
-            paint.setTextSize(42f);
-            canvas.drawText(label + " Demo", 40, 120, paint);
-            paint.setTextSize(30f);
-            canvas.drawText("Room: " + roomId + " Item: " + itemId, 40, 190, paint);
-            canvas.drawText("Property: " + propertyId, 40, 250, paint);
-
-            try (java.io.FileOutputStream outputStream = new java.io.FileOutputStream(outFile)) {
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, outputStream);
-            }
-            bitmap.recycle();
-            return outFile;
-        } catch (Exception exception) {
-            return null;
-        }
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

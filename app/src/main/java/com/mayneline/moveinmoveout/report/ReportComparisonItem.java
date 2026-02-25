@@ -6,6 +6,8 @@ public class ReportComparisonItem {
     public String roomName;
     public String itemName;
     public String status;
+    public double similarityScore;
+    public String explanation;
 
     public String moveInPath;
     public String moveInCapturedAt;

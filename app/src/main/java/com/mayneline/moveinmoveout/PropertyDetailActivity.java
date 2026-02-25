@@ -36,6 +36,7 @@ public class PropertyDetailActivity extends AppCompatActivity {
         TextView title = findViewById(R.id.textPropertyDetailTitle);
         TextView subtitle = findViewById(R.id.textPropertyDetailSubtitle);
         View shareButton = findViewById(R.id.buttonShareProperty);
+        View comparisonButton = findViewById(R.id.buttonOpenComparisonReport);
 
         String fullAddress = addressLine + (unit.isEmpty() ? "" : " Unit " + unit);
         title.setText(fullAddress);
@@ -50,6 +51,12 @@ public class PropertyDetailActivity extends AppCompatActivity {
             shareIntent.putExtra(PropertyShareActivity.EXTRA_PROPERTY_ID, propertyId);
             shareIntent.putExtra(PropertyShareActivity.EXTRA_ADDRESS_LABEL, fullAddress);
             startActivity(shareIntent);
+        });
+
+        comparisonButton.setOnClickListener(v -> {
+            Intent reportIntent = new Intent(this, ComparisonReportActivity.class);
+            reportIntent.putExtra("firestorePropertyId", propertyId);
+            startActivity(reportIntent);
         });
     }
 
