@@ -1,8 +1,11 @@
 package com.mayneline.moveinmoveout;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,6 +37,7 @@ public class PropertiesActivity extends AppCompatActivity {
     private RecyclerView recyclerProperties;
 
     private PropertiesAdapter adapter;
+    private String currentRole = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +57,7 @@ public class PropertiesActivity extends AppCompatActivity {
         recyclerProperties = findViewById(R.id.recyclerProperties);
 
         recyclerProperties.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new PropertiesAdapter();
+        adapter = new PropertiesAdapter(this::openPropertyDetail);
         recyclerProperties.setAdapter(adapter);
 
         findViewById(R.id.buttonCreateProperty).setOnClickListener(v -> createProperty());
@@ -77,6 +81,8 @@ public class PropertiesActivity extends AppCompatActivity {
                         textPropertiesStatus.setText("Role missing. Complete role selection first.");
                         return;
                     }
+                    currentRole = role;
+                    updateCreateFormVisibility();
                     repository.listPropertiesForUser(user.getUid(), role, new FirebaseRepository.RepoCallback<List<FirestoreProperty>>() {
                         @Override
                         public void onSuccess(List<FirestoreProperty> result) {
@@ -84,7 +90,7 @@ public class PropertiesActivity extends AppCompatActivity {
                                 adapter.setItems(result);
                                 if (result.isEmpty()) {
                                     if ("TENANT".equalsIgnoreCase(role)) {
-                                        textPropertiesStatus.setText("No shared properties yet (tenant invites coming next).");
+                                        textPropertiesStatus.setText("No shared properties yet.");
                                     } else {
                                         textPropertiesStatus.setText("No properties yet.");
                                     }
@@ -101,6 +107,28 @@ public class PropertiesActivity extends AppCompatActivity {
                     });
                 })
                 .addOnFailureListener(e -> textPropertiesStatus.setText("Failed to load user role."));
+    }
+
+    private void updateCreateFormVisibility() {
+        int createVisibility = "LANDLORD".equalsIgnoreCase(currentRole) ? View.VISIBLE : View.GONE;
+        editAddress.setVisibility(createVisibility);
+        editUnit.setVisibility(createVisibility);
+        editCity.setVisibility(createVisibility);
+        editState.setVisibility(createVisibility);
+        editZip.setVisibility(createVisibility);
+        findViewById(R.id.buttonCreateProperty).setVisibility(createVisibility);
+    }
+
+    private void openPropertyDetail(FirestoreProperty row) {
+        Intent intent = new Intent(this, PropertyDetailActivity.class);
+        intent.putExtra(PropertyDetailActivity.EXTRA_PROPERTY_ID, safe(row.propertyId));
+        intent.putExtra(PropertyDetailActivity.EXTRA_ADDRESS_LINE, safe(row.addressLine));
+        intent.putExtra(PropertyDetailActivity.EXTRA_UNIT, safe(row.unit));
+        intent.putExtra(PropertyDetailActivity.EXTRA_CITY, safe(row.city));
+        intent.putExtra(PropertyDetailActivity.EXTRA_STATE, safe(row.state));
+        intent.putExtra(PropertyDetailActivity.EXTRA_ZIP, safe(row.zip));
+        intent.putExtra(PropertyDetailActivity.EXTRA_ROLE, currentRole);
+        startActivity(intent);
     }
 
     private void createProperty() {
@@ -151,7 +179,16 @@ public class PropertiesActivity extends AppCompatActivity {
     }
 
     private static class PropertiesAdapter extends RecyclerView.Adapter<PropertiesAdapter.Holder> {
+        interface OnPropertyClickListener {
+            void onPropertyClick(FirestoreProperty row);
+        }
+
         private final List<FirestoreProperty> items = new ArrayList<>();
+        private final OnPropertyClickListener listener;
+
+        PropertiesAdapter(OnPropertyClickListener listener) {
+            this.listener = listener;
+        }
 
         void setItems(List<FirestoreProperty> rows) {
             items.clear();
@@ -162,8 +199,8 @@ public class PropertiesActivity extends AppCompatActivity {
         }
 
         @Override
-        public Holder onCreateViewHolder(android.view.ViewGroup parent, int viewType) {
-            View view = android.view.LayoutInflater.from(parent.getContext())
+        public Holder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
                     .inflate(android.R.layout.simple_list_item_2, parent, false);
             return new Holder(view);
         }
@@ -176,6 +213,11 @@ public class PropertiesActivity extends AppCompatActivity {
             holder.subtitle.setText((row.city == null ? "" : row.city) + ", " +
                     (row.state == null ? "" : row.state) + " " +
                     (row.zip == null ? "" : row.zip));
+            holder.itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onPropertyClick(row);
+                }
+            });
         }
 
         @Override

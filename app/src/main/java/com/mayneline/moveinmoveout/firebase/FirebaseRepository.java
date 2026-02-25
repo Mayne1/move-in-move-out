@@ -2,18 +2,24 @@ package com.mayneline.moveinmoveout.firebase;
 
 import androidx.annotation.NonNull;
 
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class FirebaseRepository {
     private final FirebaseFirestore firestore;
@@ -49,6 +55,16 @@ public class FirebaseRepository {
         public List<String> tags;
     }
 
+    public static class PropertyShare {
+        public String shareId;
+        public String propertyId;
+        public String createdByUid;
+        public String tenantEmailLower;
+        public String tenantUid;
+        public String token;
+        public String status;
+    }
+
     public void createProperty(@NonNull PropertyInput input, @NonNull RepoCallback<String> callback) {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
@@ -82,7 +98,15 @@ public class FirebaseRepository {
             return;
         }
 
-        // Tenant property sharing via invites will be added in a follow-up.
+        if ("TENANT".equalsIgnoreCase(role)) {
+            firestore.collectionGroup("shares")
+                    .whereEqualTo("tenantUid", uid)
+                    .get()
+                    .addOnSuccessListener(snapshot -> loadAcceptedPropertiesFromShares(snapshot, callback))
+                    .addOnFailureListener(callback::onError);
+            return;
+        }
+
         callback.onSuccess(new ArrayList<>());
     }
 
@@ -145,6 +169,106 @@ public class FirebaseRepository {
                 .addOnFailureListener(callback::onError);
     }
 
+    public void createPropertyShare(@NonNull String propertyId, @NonNull String tenantEmail, @NonNull RepoCallback<PropertyShare> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            callback.onError(new IllegalStateException("User not signed in"));
+            return;
+        }
+
+        CollectionReference shares = firestore.collection("properties")
+                .document(propertyId)
+                .collection("shares");
+        DocumentReference shareDoc = shares.document();
+        String token = UUID.randomUUID().toString().replace("-", "");
+        String tenantEmailLower = safe(tenantEmail).toLowerCase();
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("createdByUid", user.getUid());
+        payload.put("tenantEmailLower", tenantEmailLower);
+        payload.put("tenantUid", null);
+        payload.put("token", token);
+        payload.put("status", "PENDING");
+        payload.put("createdAt", FieldValue.serverTimestamp());
+        payload.put("acceptedAt", null);
+
+        shareDoc.set(payload)
+                .addOnSuccessListener(unused -> {
+                    PropertyShare share = new PropertyShare();
+                    share.shareId = shareDoc.getId();
+                    share.propertyId = propertyId;
+                    share.createdByUid = user.getUid();
+                    share.tenantEmailLower = tenantEmailLower;
+                    share.tenantUid = null;
+                    share.token = token;
+                    share.status = "PENDING";
+                    callback.onSuccess(share);
+                })
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void acceptShareByToken(@NonNull String token, @NonNull RepoCallback<PropertyShare> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            callback.onError(new IllegalStateException("User not signed in"));
+            return;
+        }
+        String currentEmailLower = user.getEmail() == null ? "" : user.getEmail().trim().toLowerCase();
+
+        firestore.collectionGroup("shares")
+                .whereEqualTo("token", token)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.isEmpty()) {
+                        callback.onError(new IllegalStateException("Invite not found"));
+                        return;
+                    }
+                    DocumentSnapshot doc = snapshot.getDocuments().get(0);
+                    String status = doc.getString("status");
+                    if ("REVOKED".equalsIgnoreCase(status)) {
+                        callback.onError(new IllegalStateException("Invite has been revoked"));
+                        return;
+                    }
+                    String tenantEmailLower = doc.getString("tenantEmailLower");
+                    if (tenantEmailLower == null || !tenantEmailLower.equals(currentEmailLower)) {
+                        callback.onError(new IllegalStateException("Invite email does not match signed-in user"));
+                        return;
+                    }
+
+                    DocumentReference ref = doc.getReference();
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("tenantUid", user.getUid());
+                    updates.put("status", "ACCEPTED");
+                    updates.put("acceptedAt", FieldValue.serverTimestamp());
+
+                    ref.update(updates)
+                            .addOnSuccessListener(unused -> {
+                                PropertyShare share = mapShare(doc);
+                                share.tenantUid = user.getUid();
+                                share.status = "ACCEPTED";
+                                callback.onSuccess(share);
+                            })
+                            .addOnFailureListener(callback::onError);
+                })
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void getShareByToken(@NonNull String token, @NonNull RepoCallback<PropertyShare> callback) {
+        firestore.collectionGroup("shares")
+                .whereEqualTo("token", token)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.isEmpty()) {
+                        callback.onError(new IllegalStateException("Invite not found"));
+                        return;
+                    }
+                    callback.onSuccess(mapShare(snapshot.getDocuments().get(0)));
+                })
+                .addOnFailureListener(callback::onError);
+    }
+
     private List<FirestoreProperty> mapProperties(QuerySnapshot snapshot) {
         List<FirestoreProperty> rows = new ArrayList<>();
         for (DocumentSnapshot document : snapshot.getDocuments()) {
@@ -161,6 +285,52 @@ public class FirebaseRepository {
             rows.add(row);
         }
         return rows;
+    }
+
+    private void loadAcceptedPropertiesFromShares(QuerySnapshot snapshot, RepoCallback<List<FirestoreProperty>> callback) {
+        List<Task<DocumentSnapshot>> tasks = new ArrayList<>();
+        for (DocumentSnapshot shareDoc : snapshot.getDocuments()) {
+            String status = shareDoc.getString("status");
+            if (!"ACCEPTED".equalsIgnoreCase(status)) {
+                continue;
+            }
+            DocumentReference propertyRef = shareDoc.getReference().getParent().getParent();
+            if (propertyRef != null) {
+                tasks.add(propertyRef.get());
+            }
+        }
+
+        if (tasks.isEmpty()) {
+            callback.onSuccess(new ArrayList<>());
+            return;
+        }
+
+        Tasks.whenAllSuccess(tasks)
+                .addOnSuccessListener(results -> {
+                    Map<String, FirestoreProperty> unique = new LinkedHashMap<>();
+                    for (Object result : results) {
+                        if (!(result instanceof DocumentSnapshot)) {
+                            continue;
+                        }
+                        DocumentSnapshot propertyDoc = (DocumentSnapshot) result;
+                        if (!propertyDoc.exists()) {
+                            continue;
+                        }
+                        FirestoreProperty row = new FirestoreProperty();
+                        row.propertyId = propertyDoc.getId();
+                        row.ownerUid = propertyDoc.getString("ownerUid");
+                        row.addressLine = propertyDoc.getString("addressLine");
+                        row.unit = propertyDoc.getString("unit");
+                        row.city = propertyDoc.getString("city");
+                        row.state = propertyDoc.getString("state");
+                        row.zip = propertyDoc.getString("zip");
+                        row.createdAt = propertyDoc.getTimestamp("createdAt");
+                        row.lastUpdatedAt = propertyDoc.getTimestamp("lastUpdatedAt");
+                        unique.put(row.propertyId, row);
+                    }
+                    callback.onSuccess(new ArrayList<>(unique.values()));
+                })
+                .addOnFailureListener(callback::onError);
     }
 
     private List<FirestoreMediaRecord> mapMedia(QuerySnapshot snapshot) {
@@ -187,6 +357,19 @@ public class FirebaseRepository {
             rows.add(row);
         }
         return rows;
+    }
+
+    private PropertyShare mapShare(DocumentSnapshot document) {
+        PropertyShare share = new PropertyShare();
+        share.shareId = document.getId();
+        DocumentReference propertyRef = document.getReference().getParent().getParent();
+        share.propertyId = propertyRef == null ? "" : propertyRef.getId();
+        share.createdByUid = document.getString("createdByUid");
+        share.tenantEmailLower = document.getString("tenantEmailLower");
+        share.tenantUid = document.getString("tenantUid");
+        share.token = document.getString("token");
+        share.status = document.getString("status");
+        return share;
     }
 
     private String safe(String value) {
