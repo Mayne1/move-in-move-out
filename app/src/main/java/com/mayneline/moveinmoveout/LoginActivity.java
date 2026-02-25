@@ -32,7 +32,9 @@ public class LoginActivity extends AppCompatActivity {
         editPassword = findViewById(R.id.editLoginPassword);
 
         findViewById(R.id.buttonLogin).setOnClickListener(v -> signIn());
-        findViewById(R.id.buttonSignUp).setOnClickListener(v -> signUp());
+        findViewById(R.id.buttonSignUp).setOnClickListener(v -> {
+            startActivity(new Intent(this, SignUpActivity.class));
+        });
 
         FirebaseUser currentUser = auth.getCurrentUser();
         if (currentUser != null) {
@@ -50,22 +52,6 @@ public class LoginActivity extends AppCompatActivity {
         auth.signInWithEmailAndPassword(email, password)
                 .addOnSuccessListener(result -> routeAfterAuth(result.getUser()))
                 .addOnFailureListener(e -> Toast.makeText(this, "Sign in failed", Toast.LENGTH_SHORT).show());
-    }
-
-    private void signUp() {
-        String email = safe(editEmail.getText().toString());
-        String password = safe(editPassword.getText().toString());
-        if (!validate(email, password)) {
-            return;
-        }
-
-        auth.createUserWithEmailAndPassword(email, password)
-                .addOnSuccessListener(result -> {
-                    Intent intent = new Intent(this, RoleSelectActivity.class);
-                    startActivity(intent);
-                    finish();
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Sign up failed", Toast.LENGTH_SHORT).show());
     }
 
     private void routeAfterAuth(FirebaseUser user) {
