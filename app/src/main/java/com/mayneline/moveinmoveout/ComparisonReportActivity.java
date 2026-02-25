@@ -112,7 +112,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
         firestorePropertyId = safe(getIntent().getStringExtra("firestorePropertyId"));
         if (firestorePropertyId.isEmpty()) {
             textSummary.setText("Open this report from Properties to load cloud comparison data.");
-            recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails));
+            recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails, this::openRepairTimeline));
             textEmpty.setVisibility(View.VISIBLE);
             return;
         }
@@ -161,11 +161,20 @@ public class ComparisonReportActivity extends AppCompatActivity {
             } catch (Exception exception) {
                 runOnUiThread(() -> {
                     textSummary.setText("Failed to load cloud comparison data.");
-                    recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails));
+                    recyclerComparison.setAdapter(new ComparisonReportAdapter(new ArrayList<>(), this::openDetails, this::openRepairTimeline));
                     textEmpty.setVisibility(View.VISIBLE);
                 });
             }
         });
+    }
+
+    private void openRepairTimeline(ComparisonRow row) {
+        Intent intent = new Intent(this, TimelineActivity.class);
+        intent.putExtra("firestorePropertyId", firestorePropertyId);
+        intent.putExtra("propertyAddress", propertyAddress);
+        intent.putExtra("roomName", row.getRoom());
+        intent.putExtra("itemName", row.getItem());
+        startActivity(intent);
     }
 
     private void openDetails(ComparisonRow row) {
@@ -207,7 +216,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
             filtered.add(row);
         }
         filteredRows = filtered;
-        recyclerComparison.setAdapter(new ComparisonReportAdapter(filtered, this::openDetails));
+        recyclerComparison.setAdapter(new ComparisonReportAdapter(filtered, this::openDetails, this::openRepairTimeline));
         textEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
     }
 

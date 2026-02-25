@@ -76,10 +76,23 @@
         android:layout_marginTop="8dp"
         android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/buttonDetails"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="Details" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/buttonDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Details" />
+
+        <Button
+            android:id="@+id/buttonAddRepairEvidence"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Add Repair Evidence" />
+    </LinearLayout>
 </LinearLayout>

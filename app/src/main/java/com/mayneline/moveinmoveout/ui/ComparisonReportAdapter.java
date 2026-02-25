@@ -24,13 +24,22 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
     public interface OnDetailsClickListener {
         void onDetailsClick(ComparisonRow row);
     }
+    public interface OnRepairClickListener {
+        void onRepairClick(ComparisonRow row);
+    }
 
     private final List<ComparisonRow> rows;
     private final OnDetailsClickListener detailsClickListener;
+    private final OnRepairClickListener repairClickListener;
 
-    public ComparisonReportAdapter(List<ComparisonRow> rows, OnDetailsClickListener detailsClickListener) {
+    public ComparisonReportAdapter(
+            List<ComparisonRow> rows,
+            OnDetailsClickListener detailsClickListener,
+            OnRepairClickListener repairClickListener
+    ) {
         this.rows = rows;
         this.detailsClickListener = detailsClickListener;
+        this.repairClickListener = repairClickListener;
     }
 
     @NonNull
@@ -42,7 +51,7 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
 
     @Override
     public void onBindViewHolder(@NonNull ComparisonViewHolder holder, int position) {
-        holder.bind(rows.get(position), detailsClickListener);
+        holder.bind(rows.get(position), detailsClickListener, repairClickListener);
     }
 
     @Override
@@ -57,6 +66,7 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
         private final ImageView imageMoveOut;
         private final TextView textStatus;
         private final Button buttonDetails;
+        private final Button buttonAddRepairEvidence;
 
         ComparisonViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -66,9 +76,10 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             imageMoveOut = itemView.findViewById(R.id.imageMoveOut);
             textStatus = itemView.findViewById(R.id.textStatus);
             buttonDetails = itemView.findViewById(R.id.buttonDetails);
+            buttonAddRepairEvidence = itemView.findViewById(R.id.buttonAddRepairEvidence);
         }
 
-        void bind(ComparisonRow row, OnDetailsClickListener listener) {
+        void bind(ComparisonRow row, OnDetailsClickListener detailsListener, OnRepairClickListener repairListener) {
             textRoom.setText("Room: " + row.getRoom());
             textItem.setText("Item: " + row.getItem());
             bindImage(imageMoveIn, row.getMoveInPath());
@@ -76,8 +87,13 @@ public class ComparisonReportAdapter extends RecyclerView.Adapter<ComparisonRepo
             textStatus.setText("Status: " + displayStatus(row.getStatus()));
             textStatus.setTextColor(statusColor(row.getStatus()));
             buttonDetails.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onDetailsClick(row);
+                if (detailsListener != null) {
+                    detailsListener.onDetailsClick(row);
+                }
+            });
+            buttonAddRepairEvidence.setOnClickListener(v -> {
+                if (repairListener != null) {
+                    repairListener.onRepairClick(row);
                 }
             });
         }

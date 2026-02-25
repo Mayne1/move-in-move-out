@@ -1,31 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:layout_height="match_parent">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:text="Timeline"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#EDEDED"
-        android:gravity="center"
-        android:padding="16dp"
-        android:text="Timeline entries will appear here." />
+        <TextView
+            android:id="@+id/textTimelineTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Item Timeline"
+            android:textSize="22sp"
+            android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/buttonAddEntry"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Add Entry" />
-</LinearLayout>
+        <TextView
+            android:id="@+id/textTimelineProperty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="Property" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Move In"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imageTimelineMoveIn"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:adjustViewBounds="true"
+            android:background="#D9D9D9"
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/textTimelineMoveIn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="-" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Repair"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imageTimelineRepair"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:adjustViewBounds="true"
+            android:background="#D9D9D9"
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/textTimelineRepair"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="-" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Move Out"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imageTimelineMoveOut"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:adjustViewBounds="true"
+            android:background="#D9D9D9"
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/textTimelineMoveOut"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="-" />
+
+        <Button
+            android:id="@+id/buttonAddRepairEvidence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Request Repair / Add Repair Evidence" />
+
+        <Button
+            android:id="@+id/buttonExportRepairAppendix"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Export Repair Appendix PDF" />
+    </LinearLayout>
+</ScrollView>

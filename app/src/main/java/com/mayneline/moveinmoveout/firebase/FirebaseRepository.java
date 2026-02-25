@@ -65,6 +65,12 @@ public class FirebaseRepository {
         public String status;
     }
 
+    public static class InspectionSummary {
+        public String inspectionId;
+        public String mode;
+        public boolean finalized;
+    }
+
     public void createProperty(@NonNull PropertyInput input, @NonNull RepoCallback<String> callback) {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
@@ -166,6 +172,29 @@ public class FirebaseRepository {
                 .collection("media")
                 .get()
                 .addOnSuccessListener(snapshot -> callback.onSuccess(mapMedia(snapshot)))
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void getLatestInspectionForMode(@NonNull String propertyId, @NonNull String mode, @NonNull RepoCallback<InspectionSummary> callback) {
+        firestore.collection("properties")
+                .document(propertyId)
+                .collection("inspections")
+                .whereEqualTo("mode", mode)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.isEmpty()) {
+                        callback.onSuccess(null);
+                        return;
+                    }
+                    DocumentSnapshot document = snapshot.getDocuments().get(0);
+                    InspectionSummary summary = new InspectionSummary();
+                    summary.inspectionId = document.getId();
+                    summary.mode = mode;
+                    summary.finalized = Boolean.TRUE.equals(document.getBoolean("finalized"));
+                    callback.onSuccess(summary);
+                })
                 .addOnFailureListener(callback::onError);
     }
 
