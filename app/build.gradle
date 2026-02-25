@@ -5,18 +5,14 @@ plugins {
 
 android {
     namespace 'com.mayneline.moveinmoveout'
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk 35
 
     def runNumber = System.getenv("GITHUB_RUN_NUMBER")
 
     defaultConfig {
         applicationId "com.mayneline.moveinmoveout"
         minSdk 24
-        targetSdk 36
+        targetSdk 35
         if (runNumber != null) {
             versionCode Integer.parseInt(runNumber)
             versionName "1.0-dev.${runNumber}"
