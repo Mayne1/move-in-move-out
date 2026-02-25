@@ -3,7 +3,9 @@ package com.mayneline.moveinmoveout;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,6 +47,8 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private TextView textEmpty;
     private TextView textSummary;
     private TextView textScope;
+    private EditText editRoomFilter;
+    private EditText editItemKeywordFilter;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -53,6 +57,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
     private final Set<String> selectedRooms = new LinkedHashSet<>();
     private final Set<String> selectedItems = new LinkedHashSet<>();
     private List<ComparisonRow> allRows = new ArrayList<>();
+    private List<ComparisonRow> filteredRows = new ArrayList<>();
 
     private String propertyAddress = "";
     private String moveInInspectionTime = "";
@@ -70,9 +75,21 @@ public class ComparisonReportActivity extends AppCompatActivity {
         textEmpty = findViewById(R.id.textEmpty);
         textSummary = findViewById(R.id.textSummary);
         textScope = findViewById(R.id.textScope);
+        editRoomFilter = findViewById(R.id.editRoomFilter);
+        editItemKeywordFilter = findViewById(R.id.editItemKeywordFilter);
 
         recyclerComparison.setLayoutManager(new LinearLayoutManager(this));
         findViewById(R.id.buttonRefreshComparison).setOnClickListener(v -> loadComparisonRows());
+        findViewById(R.id.buttonApplyTextFilters).setOnClickListener(v -> {
+            applyFilter();
+            updateSummaryText();
+        });
+        findViewById(R.id.buttonClearTextFilters).setOnClickListener(v -> {
+            editRoomFilter.setText("");
+            editItemKeywordFilter.setText("");
+            applyFilter();
+            updateSummaryText();
+        });
         findViewById(R.id.buttonSeedDemoPair).setVisibility(View.GONE);
         findViewById(R.id.buttonFilterAll).setOnClickListener(v -> setFilter(FILTER_ALL));
         findViewById(R.id.buttonFilterMissing).setOnClickListener(v -> setFilter(FILTER_MISSING));
@@ -175,6 +192,9 @@ public class ComparisonReportActivity extends AppCompatActivity {
             if (!isIncludedByScope(row)) {
                 continue;
             }
+            if (!matchesTextFilters(row)) {
+                continue;
+            }
             if (activeFilter == FILTER_MISSING && !STATUS_MEDIA_MISSING.equals(row.getStatus())) {
                 continue;
             }
@@ -186,6 +206,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
             }
             filtered.add(row);
         }
+        filteredRows = filtered;
         recyclerComparison.setAdapter(new ComparisonReportAdapter(filtered, this::openDetails));
         textEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
     }
@@ -195,10 +216,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
         int noChange = 0;
         int needsReview = 0;
 
-        for (ComparisonRow row : allRows) {
-            if (!isIncludedByScope(row)) {
-                continue;
-            }
+        for (ComparisonRow row : filteredRows) {
             if (STATUS_MEDIA_MISSING.equals(row.getStatus())) {
                 missing++;
             } else if (STATUS_NO_CHANGE.equals(row.getStatus())) {
@@ -215,6 +233,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
                         + "\nMissing: " + missing
                         + " | No Change: " + noChange
                         + " | Needs Review: " + needsReview
+                        + "\nFiltered rows: " + filteredRows.size()
         );
     }
 
@@ -316,7 +335,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
     }
 
     private void exportAndShareReport() {
-        if (allRows.isEmpty()) {
+        if (filteredRows.isEmpty()) {
             Toast.makeText(this, "No rows available", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -326,13 +345,7 @@ public class ComparisonReportActivity extends AppCompatActivity {
         int needsReview = 0;
         int noChange = 0;
 
-        for (ComparisonRow row : allRows) {
-            if (!isIncludedByScope(row)) {
-                continue;
-            }
-            if (!isIncludedByActiveFilter(row)) {
-                continue;
-            }
+        for (ComparisonRow row : filteredRows) {
 
             ReportComparisonItem item = new ReportComparisonItem();
             item.roomId = row.getRoomId();
@@ -412,6 +425,27 @@ public class ComparisonReportActivity extends AppCompatActivity {
             return STATUS_NEEDS_REVIEW.equals(row.getStatus());
         }
         return STATUS_NO_CHANGE.equals(row.getStatus());
+    }
+
+    private boolean matchesTextFilters(ComparisonRow row) {
+        String roomFilter = safe(editRoomFilter.getText() == null ? "" : editRoomFilter.getText().toString()).toLowerCase();
+        String itemFilter = safe(editItemKeywordFilter.getText() == null ? "" : editItemKeywordFilter.getText().toString()).toLowerCase();
+
+        if (!TextUtils.isEmpty(roomFilter)) {
+            String roomName = safe(row.getRoom()).toLowerCase();
+            if (!roomName.contains(roomFilter)) {
+                return false;
+            }
+        }
+
+        if (!TextUtils.isEmpty(itemFilter)) {
+            String itemName = safe(row.getItem()).toLowerCase();
+            if (!itemName.contains(itemFilter)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void shareFile(File file) {

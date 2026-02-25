@@ -32,6 +32,49 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/editRoomFilter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Filter room (e.g. bedroom, kitchen)"
+            android:inputType="textCapWords" />
+
+        <EditText
+            android:id="@+id/editItemKeywordFilter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:hint="Filter item keyword (e.g. wall, carpet, floor)"
+            android:inputType="text" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/buttonApplyTextFilters"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Apply Filters" />
+
+            <Button
+                android:id="@+id/buttonClearTextFilters"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Clear Filters" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
         android:orientation="horizontal">
 
         <Button
@@ -61,6 +104,13 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="No Change" />
+
+        <Button
+            android:id="@+id/buttonFilterChangeDetected"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Changed" />
     </LinearLayout>
 
     <Button
