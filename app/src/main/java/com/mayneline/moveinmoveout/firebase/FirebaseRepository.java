@@ -159,7 +159,17 @@ public class FirebaseRepository {
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .addOnSuccessListener(snapshot -> callback.onSuccess(mapTenantPlaces(snapshot)))
-                .addOnFailureListener(callback::onError);
+                .addOnFailureListener(primaryError -> {
+                    Log.e(TAG, "loadTenantPlaces primary query failed; retrying without orderBy for uid=" + uid, primaryError);
+                    firestore.collection(COLLECTION_TENANT_PLACES)
+                            .whereEqualTo("tenantUid", uid)
+                            .get()
+                            .addOnSuccessListener(snapshot -> callback.onSuccess(mapTenantPlaces(snapshot)))
+                            .addOnFailureListener(fallbackError -> {
+                                Log.e(TAG, "loadTenantPlaces fallback query failed; returning empty list for uid=" + uid, fallbackError);
+                                callback.onSuccess(new ArrayList<>());
+                            });
+                });
     }
 
     public void listPropertiesForUser(@NonNull String uid, @NonNull String role, @NonNull RepoCallback<List<FirestoreProperty>> callback) {

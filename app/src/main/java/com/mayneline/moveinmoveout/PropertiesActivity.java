@@ -116,7 +116,7 @@ public class PropertiesActivity extends AppCompatActivity {
                 @Override
                 public void onError(@NonNull Exception exception) {
                     Log.e(TAG, "Tenant places load failed for uid=" + uid, exception);
-                    runOnUiThread(() -> textPropertiesStatus.setText("Unable to load My List."));
+                    runOnUiThread(() -> textPropertiesStatus.setText("No places in My List yet."));
                 }
             });
             return;
