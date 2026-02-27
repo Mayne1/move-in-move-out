@@ -18,6 +18,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.mayneline.moveinmoveout.data.AppDatabase;
 import com.mayneline.moveinmoveout.data.PropertyRoom;
 import com.mayneline.moveinmoveout.data.RoomItem;
@@ -350,7 +352,7 @@ public class InspectionWizardActivity extends AppCompatActivity {
             return;
         }
 
-        String storagePath = "captures/" + firestorePropertyId + "/" + inspectionId + "/" + mode + "/" + media.id + "_" + localFile.getName();
+        String storagePath = buildCloudCapturePath(localFile.getName());
         StorageReference storageRef = FirebaseStorage.getInstance().getReference().child(storagePath);
         storageRef.putFile(Uri.fromFile(localFile))
                 .continueWithTask(task -> {
@@ -396,6 +398,12 @@ public class InspectionWizardActivity extends AppCompatActivity {
                     db.mediaDao().updateMedia(media);
                     SyncWorkScheduler.enqueueMediaSync(InspectionWizardActivity.this);
                 });
+    }
+
+    private String buildCloudCapturePath(String fileName) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        String uid = user == null ? "unknown" : user.getUid();
+        return "captures/" + uid + "/" + firestorePropertyId + "/" + fileName;
     }
 
     private File buildCaptureFile(Step step, long timestamp, String extension) {

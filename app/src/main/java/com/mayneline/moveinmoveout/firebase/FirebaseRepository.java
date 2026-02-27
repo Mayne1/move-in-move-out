@@ -7,6 +7,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -25,6 +26,7 @@ import java.util.UUID;
 
 public class FirebaseRepository {
     private static final String TAG = "FirebaseRepository";
+    private static final String COLLECTION_TENANT_PLACES = "tenant_places";
     public static final String VERIFICATION_STATUS_PENDING = "pending";
     @SuppressWarnings("unused")
     public static final String VERIFICATION_STATUS_VERIFIED = "verified";
@@ -80,6 +82,18 @@ public class FirebaseRepository {
         public boolean finalized;
     }
 
+    public static class PropertyRecord {
+        public String id;
+        public String tenantUid;
+        public String addressLine;
+        public String unit;
+        public String city;
+        public String state;
+        public String zip;
+        public Timestamp createdAt;
+        public Timestamp lastUpdatedAt;
+    }
+
     public void createProperty(@NonNull PropertyInput input, @NonNull RepoCallback<String> callback) {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
@@ -107,6 +121,44 @@ public class FirebaseRepository {
 
         doc.set(payload)
                 .addOnSuccessListener(unused -> callback.onSuccess(doc.getId()))
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void createTenantPlace(@NonNull PropertyInput input, @NonNull RepoCallback<String> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            callback.onError(new IllegalStateException("User not signed in"));
+            return;
+        }
+
+        DocumentReference doc = firestore.collection(COLLECTION_TENANT_PLACES).document();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("tenantUid", user.getUid());
+        payload.put("addressLine", safe(input.addressLine));
+        payload.put("unit", safe(input.unit));
+        payload.put("city", safe(input.city));
+        payload.put("state", safe(input.state));
+        payload.put("zip", safe(input.zip));
+        payload.put("createdAt", FieldValue.serverTimestamp());
+        payload.put("lastUpdatedAt", FieldValue.serverTimestamp());
+
+        doc.set(payload)
+                .addOnSuccessListener(unused -> callback.onSuccess(doc.getId()))
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void loadTenantPlaces(@NonNull RepoCallback<List<PropertyRecord>> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            callback.onError(new IllegalStateException("User not signed in"));
+            return;
+        }
+        String uid = user.getUid();
+        firestore.collection(COLLECTION_TENANT_PLACES)
+                .whereEqualTo("tenantUid", uid)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(snapshot -> callback.onSuccess(mapTenantPlaces(snapshot)))
                 .addOnFailureListener(callback::onError);
     }
 
@@ -421,6 +473,24 @@ public class FirebaseRepository {
             FirestoreProperty row = new FirestoreProperty();
             row.propertyId = document.getId();
             row.ownerUid = document.getString("ownerUid");
+            row.addressLine = document.getString("addressLine");
+            row.unit = document.getString("unit");
+            row.city = document.getString("city");
+            row.state = document.getString("state");
+            row.zip = document.getString("zip");
+            row.createdAt = document.getTimestamp("createdAt");
+            row.lastUpdatedAt = document.getTimestamp("lastUpdatedAt");
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private List<PropertyRecord> mapTenantPlaces(QuerySnapshot snapshot) {
+        List<PropertyRecord> rows = new ArrayList<>();
+        for (DocumentSnapshot document : snapshot.getDocuments()) {
+            PropertyRecord row = new PropertyRecord();
+            row.id = document.getId();
+            row.tenantUid = document.getString("tenantUid");
             row.addressLine = document.getString("addressLine");
             row.unit = document.getString("unit");
             row.city = document.getString("city");

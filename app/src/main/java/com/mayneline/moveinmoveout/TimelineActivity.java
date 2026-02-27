@@ -17,6 +17,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -170,7 +172,7 @@ public class TimelineActivity extends AppCompatActivity {
             return;
         }
 
-        String storagePath = "captures/" + firestorePropertyId + "/" + repairInspectionId + "/REPAIR/" + outFile.getName();
+        String storagePath = buildCloudCapturePath(outFile.getName());
         StorageReference storageRef = FirebaseStorage.getInstance().getReference().child(storagePath);
         storageRef.putFile(Uri.fromFile(outFile))
                 .continueWithTask(task -> {
@@ -365,6 +367,12 @@ public class TimelineActivity extends AppCompatActivity {
 
     private String sanitize(String value) {
         return safe(value).replaceAll("[^A-Za-z0-9_-]", "_");
+    }
+
+    private String buildCloudCapturePath(String fileName) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        String uid = user == null ? "unknown" : user.getUid();
+        return "captures/" + uid + "/" + firestorePropertyId + "/" + fileName;
     }
 
     private String safe(String value) {

@@ -8,6 +8,8 @@ import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
@@ -107,12 +109,12 @@ public class MediaSyncWorker extends Worker {
     }
 
     private String buildStoragePath(RoomItemMedia media, String fileName) {
-        String mode = media.mode == null || media.mode.isEmpty() ? "MOVE_IN" : media.mode;
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        String uid = user == null ? "unknown" : user.getUid();
         return "captures/"
+                + uid + "/"
                 + media.firestorePropertyId + "/"
-                + media.firestoreInspectionId + "/"
-                + mode + "/"
-                + media.id + "_" + fileName;
+                + fileName;
     }
 
     private String safe(String value) {

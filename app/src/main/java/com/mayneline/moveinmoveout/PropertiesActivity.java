@@ -36,6 +36,7 @@ public class PropertiesActivity extends AppCompatActivity {
     private EditText editCity;
     private EditText editState;
     private EditText editZip;
+    private TextView textPropertiesTitle;
     private TextView textPropertiesStatus;
     private RecyclerView recyclerProperties;
 
@@ -56,6 +57,7 @@ public class PropertiesActivity extends AppCompatActivity {
         editCity = findViewById(R.id.editPropertyCity);
         editState = findViewById(R.id.editPropertyState);
         editZip = findViewById(R.id.editPropertyZip);
+        textPropertiesTitle = findViewById(R.id.textPropertiesTitle);
         textPropertiesStatus = findViewById(R.id.textPropertiesStatus);
         recyclerProperties = findViewById(R.id.recyclerProperties);
 
@@ -96,6 +98,30 @@ public class PropertiesActivity extends AppCompatActivity {
     }
 
     private void loadRowsForRole(String uid, String role) {
+        if ("TENANT".equalsIgnoreCase(role)) {
+            repository.loadTenantPlaces(new FirebaseRepository.RepoCallback<List<FirebaseRepository.PropertyRecord>>() {
+                @Override
+                public void onSuccess(@NonNull List<FirebaseRepository.PropertyRecord> result) {
+                    runOnUiThread(() -> {
+                        List<FirestoreProperty> rows = toFirestoreRows(result);
+                        adapter.setItems(rows);
+                        if (rows.isEmpty()) {
+                            textPropertiesStatus.setText("No places in My List yet.");
+                        } else {
+                            textPropertiesStatus.setText("Loaded " + rows.size() + " places.");
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(@NonNull Exception exception) {
+                    Log.e(TAG, "Tenant places load failed for uid=" + uid, exception);
+                    runOnUiThread(() -> textPropertiesStatus.setText("Unable to load My List."));
+                }
+            });
+            return;
+        }
+
         repository.listPropertiesForUser(uid, role, new FirebaseRepository.RepoCallback<List<FirestoreProperty>>() {
             @Override
             public void onSuccess(@NonNull List<FirestoreProperty> result) {
@@ -128,13 +154,20 @@ public class PropertiesActivity extends AppCompatActivity {
     }
 
     private void updateCreateFormVisibility() {
-        int createVisibility = "LANDLORD".equalsIgnoreCase(currentRole) ? View.VISIBLE : View.GONE;
+        boolean isTenant = "TENANT".equalsIgnoreCase(currentRole);
+        boolean canCreate = "LANDLORD".equalsIgnoreCase(currentRole) || isTenant;
+        int createVisibility = canCreate ? View.VISIBLE : View.GONE;
         editAddress.setVisibility(createVisibility);
         editUnit.setVisibility(createVisibility);
         editCity.setVisibility(createVisibility);
         editState.setVisibility(createVisibility);
         editZip.setVisibility(createVisibility);
-        findViewById(R.id.buttonCreateProperty).setVisibility(createVisibility);
+        View buttonCreateProperty = findViewById(R.id.buttonCreateProperty);
+        buttonCreateProperty.setVisibility(createVisibility);
+        textPropertiesTitle.setText(isTenant ? "My List" : "Properties");
+        if (buttonCreateProperty instanceof TextView) {
+            ((TextView) buttonCreateProperty).setText(isTenant ? "Add Place" : "Create Property");
+        }
     }
 
     private void openPropertyDetail(FirestoreProperty row) {
@@ -173,15 +206,19 @@ public class PropertiesActivity extends AppCompatActivity {
         input.state = state;
         input.zip = zip;
 
-        repository.createProperty(input, new FirebaseRepository.RepoCallback<String>() {
+        FirebaseRepository.RepoCallback<String> callback = new FirebaseRepository.RepoCallback<String>() {
             @Override
             public void onSuccess(@NonNull String result) {
                 runOnUiThread(() -> {
-                    Toast.makeText(
-                            PropertiesActivity.this,
-                            "Property submitted. Verification pending (20-48 hours).",
-                            Toast.LENGTH_LONG
-                    ).show();
+                    if ("TENANT".equalsIgnoreCase(currentRole)) {
+                        Toast.makeText(PropertiesActivity.this, "Place added to My List.", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(
+                                PropertiesActivity.this,
+                                "Property submitted. Verification pending (20-48 hours).",
+                                Toast.LENGTH_LONG
+                        ).show();
+                    }
                     clearCreateForm();
                     loadProperties();
                 });
@@ -189,9 +226,39 @@ public class PropertiesActivity extends AppCompatActivity {
 
             @Override
             public void onError(@NonNull Exception exception) {
-                runOnUiThread(() -> Toast.makeText(PropertiesActivity.this, "Failed to create property", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> {
+                    if ("TENANT".equalsIgnoreCase(currentRole)) {
+                        Toast.makeText(PropertiesActivity.this, "Failed to add place", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(PropertiesActivity.this, "Failed to create property", Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
-        });
+        };
+
+        if ("TENANT".equalsIgnoreCase(currentRole)) {
+            repository.createTenantPlace(input, callback);
+        } else {
+            repository.createProperty(input, callback);
+        }
+    }
+
+    private List<FirestoreProperty> toFirestoreRows(List<FirebaseRepository.PropertyRecord> records) {
+        List<FirestoreProperty> rows = new ArrayList<>();
+        if (records == null) {
+            return rows;
+        }
+        for (FirebaseRepository.PropertyRecord record : records) {
+            FirestoreProperty row = new FirestoreProperty();
+            row.propertyId = safe(record.id);
+            row.addressLine = safe(record.addressLine);
+            row.unit = safe(record.unit);
+            row.city = safe(record.city);
+            row.state = safe(record.state);
+            row.zip = safe(record.zip);
+            rows.add(row);
+        }
+        return rows;
     }
 
     private void clearCreateForm() {
