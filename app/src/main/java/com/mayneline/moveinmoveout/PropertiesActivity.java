@@ -140,6 +140,12 @@ public class PropertiesActivity extends AppCompatActivity {
     }
 
     private void createProperty() {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            Toast.makeText(this, "You must be signed in to create a property", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String address = safe(editAddress.getText().toString());
         String city = safe(editCity.getText().toString());
         String state = safe(editState.getText().toString());
@@ -161,7 +167,11 @@ public class PropertiesActivity extends AppCompatActivity {
             @Override
             public void onSuccess(String result) {
                 runOnUiThread(() -> {
-                    Toast.makeText(PropertiesActivity.this, "Property created", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(
+                            PropertiesActivity.this,
+                            "Property submitted. Verification pending (20-48 hours).",
+                            Toast.LENGTH_LONG
+                    ).show();
                     clearCreateForm();
                     loadProperties();
                 });

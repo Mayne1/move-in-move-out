@@ -22,6 +22,10 @@ import java.util.Map;
 import java.util.UUID;
 
 public class FirebaseRepository {
+    public static final String VERIFICATION_STATUS_PENDING = "pending";
+    public static final String VERIFICATION_STATUS_VERIFIED = "verified";
+    public static final String VERIFICATION_STATUS_DENIED = "denied";
+
     private final FirebaseFirestore firestore;
     private final FirebaseAuth auth;
 
@@ -81,11 +85,17 @@ public class FirebaseRepository {
         DocumentReference doc = firestore.collection("properties").document();
         Map<String, Object> payload = new HashMap<>();
         payload.put("ownerUid", user.getUid());
+        payload.put("address", safe(input.addressLine));
         payload.put("addressLine", safe(input.addressLine));
         payload.put("unit", safe(input.unit));
         payload.put("city", safe(input.city));
         payload.put("state", safe(input.state));
         payload.put("zip", safe(input.zip));
+        payload.put("verificationStatus", VERIFICATION_STATUS_PENDING);
+        payload.put("submittedAt", FieldValue.serverTimestamp());
+        payload.put("verifiedAt", null);
+        payload.put("verifiedBy", null);
+        payload.put("denialReason", null);
         payload.put("createdAt", FieldValue.serverTimestamp());
         payload.put("lastUpdatedAt", FieldValue.serverTimestamp());
 
