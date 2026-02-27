@@ -12,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -97,7 +98,7 @@ public class PropertiesActivity extends AppCompatActivity {
     private void loadRowsForRole(String uid, String role) {
         repository.listPropertiesForUser(uid, role, new FirebaseRepository.RepoCallback<List<FirestoreProperty>>() {
             @Override
-            public void onSuccess(List<FirestoreProperty> result) {
+            public void onSuccess(@NonNull List<FirestoreProperty> result) {
                 runOnUiThread(() -> {
                     adapter.setItems(result);
                     if (result.isEmpty()) {
@@ -113,7 +114,7 @@ public class PropertiesActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onError(Exception exception) {
+            public void onError(@NonNull Exception exception) {
                 Log.e(TAG, "Property load failed for role=" + role + ", uid=" + uid, exception);
                 runOnUiThread(() -> {
                     if ("TENANT".equalsIgnoreCase(role)) {
@@ -174,7 +175,7 @@ public class PropertiesActivity extends AppCompatActivity {
 
         repository.createProperty(input, new FirebaseRepository.RepoCallback<String>() {
             @Override
-            public void onSuccess(String result) {
+            public void onSuccess(@NonNull String result) {
                 runOnUiThread(() -> {
                     Toast.makeText(
                             PropertiesActivity.this,
@@ -187,7 +188,7 @@ public class PropertiesActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onError(Exception exception) {
+            public void onError(@NonNull Exception exception) {
                 runOnUiThread(() -> Toast.makeText(PropertiesActivity.this, "Failed to create property", Toast.LENGTH_SHORT).show());
             }
         });

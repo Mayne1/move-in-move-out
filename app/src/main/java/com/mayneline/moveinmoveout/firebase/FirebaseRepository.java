@@ -26,7 +26,9 @@ import java.util.UUID;
 public class FirebaseRepository {
     private static final String TAG = "FirebaseRepository";
     public static final String VERIFICATION_STATUS_PENDING = "pending";
+    @SuppressWarnings("unused")
     public static final String VERIFICATION_STATUS_VERIFIED = "verified";
+    @SuppressWarnings("unused")
     public static final String VERIFICATION_STATUS_DENIED = "denied";
 
     private final FirebaseFirestore firestore;
@@ -198,6 +200,7 @@ public class FirebaseRepository {
                 .addOnFailureListener(callback::onError);
     }
 
+    @SuppressWarnings("unused")
     public void listInspectionMedia(@NonNull String propertyId, @NonNull String inspectionId, @NonNull RepoCallback<List<FirestoreMediaRecord>> callback) {
         firestore.collection("properties")
                 .document(propertyId)
@@ -340,6 +343,7 @@ public class FirebaseRepository {
                 .addOnFailureListener(callback::onError);
     }
 
+    @SuppressWarnings("unused")
     public void backfillTenantUidsForCurrentLandlord(@NonNull RepoCallback<Integer> callback) {
         FirebaseUser user = auth.getCurrentUser();
         if (user == null) {
@@ -397,11 +401,12 @@ public class FirebaseRepository {
                                     callback.onSuccess(0);
                                     return;
                                 }
+                                final int updatedCount = updates;
 
                                 batch.commit()
                                         .addOnSuccessListener(unused -> {
-                                            Log.d(TAG, "Backfill: tenantUids updated for properties=" + updates + ", ownerUid=" + ownerUid);
-                                            callback.onSuccess(updates);
+                                            Log.d(TAG, "Backfill: tenantUids updated for properties=" + updatedCount + ", ownerUid=" + ownerUid);
+                                            callback.onSuccess(updatedCount);
                                         })
                                         .addOnFailureListener(callback::onError);
                             })
