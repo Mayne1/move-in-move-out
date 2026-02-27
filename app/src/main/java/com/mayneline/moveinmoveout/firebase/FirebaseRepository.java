@@ -1,6 +1,7 @@
 package com.mayneline.moveinmoveout.firebase;
 
 import androidx.annotation.NonNull;
+import android.util.Log;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
@@ -13,6 +14,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public class FirebaseRepository {
+    private static final String TAG = "FirebaseRepository";
     public static final String VERIFICATION_STATUS_PENDING = "pending";
     public static final String VERIFICATION_STATUS_VERIFIED = "verified";
     public static final String VERIFICATION_STATUS_DENIED = "denied";
@@ -91,6 +94,7 @@ public class FirebaseRepository {
         payload.put("city", safe(input.city));
         payload.put("state", safe(input.state));
         payload.put("zip", safe(input.zip));
+        payload.put("tenantUids", new ArrayList<String>());
         payload.put("verificationStatus", VERIFICATION_STATUS_PENDING);
         payload.put("submittedAt", FieldValue.serverTimestamp());
         payload.put("verifiedAt", null);
@@ -106,23 +110,43 @@ public class FirebaseRepository {
 
     public void listPropertiesForUser(@NonNull String uid, @NonNull String role, @NonNull RepoCallback<List<FirestoreProperty>> callback) {
         if ("LANDLORD".equalsIgnoreCase(role)) {
+            Log.d(TAG, "Loading LANDLORD properties for uid=" + uid);
             firestore.collection("properties")
                     .whereEqualTo("ownerUid", uid)
                     .get()
-                    .addOnSuccessListener(snapshot -> callback.onSuccess(mapProperties(snapshot)))
-                    .addOnFailureListener(callback::onError);
+                    .addOnSuccessListener(snapshot -> {
+                        Log.d(TAG, "LANDLORD properties result count=" + snapshot.size());
+                        callback.onSuccess(mapProperties(snapshot));
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "LANDLORD properties query failed for uid=" + uid, exception);
+                        callback.onError(exception);
+                    });
             return;
         }
 
         if ("TENANT".equalsIgnoreCase(role)) {
-            firestore.collectionGroup("shares")
-                    .whereEqualTo("tenantUid", uid)
+            Log.d(TAG, "Loading TENANT properties by tenantUids for uid=" + uid);
+            firestore.collection("properties")
+                    .whereArrayContains("tenantUids", uid)
                     .get()
-                    .addOnSuccessListener(snapshot -> loadAcceptedPropertiesFromShares(snapshot, callback))
-                    .addOnFailureListener(callback::onError);
+                    .addOnSuccessListener(snapshot -> {
+                        if (!snapshot.isEmpty()) {
+                            Log.d(TAG, "TENANT properties result count=" + snapshot.size() + " via tenantUids");
+                            callback.onSuccess(mapProperties(snapshot));
+                            return;
+                        }
+                        Log.d(TAG, "TENANT properties empty via tenantUids. Trying shares fallback for uid=" + uid);
+                        loadTenantPropertiesViaSharesFallback(uid, callback);
+                    })
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "TENANT tenantUids query failed. Trying shares fallback for uid=" + uid, exception);
+                        loadTenantPropertiesViaSharesFallback(uid, callback);
+                    });
             return;
         }
 
+        Log.w(TAG, "Unknown role in listPropertiesForUser: " + role);
         callback.onSuccess(new ArrayList<>());
     }
 
@@ -280,8 +304,16 @@ public class FirebaseRepository {
                     updates.put("tenantUid", user.getUid());
                     updates.put("status", "ACCEPTED");
                     updates.put("acceptedAt", FieldValue.serverTimestamp());
+                    DocumentReference propertyRef = ref.getParent().getParent();
+                    WriteBatch batch = firestore.batch();
+                    batch.update(ref, updates);
+                    if (propertyRef != null) {
+                        batch.update(propertyRef, "tenantUids", FieldValue.arrayUnion(user.getUid()));
+                    } else {
+                        Log.w(TAG, "acceptShareByToken: propertyRef was null for shareId=" + ref.getId());
+                    }
 
-                    ref.update(updates)
+                    batch.commit()
                             .addOnSuccessListener(unused -> {
                                 PropertyShare share = mapShare(doc);
                                 share.tenantUid = user.getUid();
@@ -304,6 +336,76 @@ public class FirebaseRepository {
                         return;
                     }
                     callback.onSuccess(mapShare(snapshot.getDocuments().get(0)));
+                })
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void backfillTenantUidsForCurrentLandlord(@NonNull RepoCallback<Integer> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            callback.onError(new IllegalStateException("User not signed in"));
+            return;
+        }
+        String ownerUid = user.getUid();
+
+        firestore.collection("properties")
+                .whereEqualTo("ownerUid", ownerUid)
+                .get()
+                .addOnSuccessListener(propertiesSnapshot -> {
+                    if (propertiesSnapshot.isEmpty()) {
+                        Log.d(TAG, "Backfill: no landlord properties for uid=" + ownerUid);
+                        callback.onSuccess(0);
+                        return;
+                    }
+
+                    List<Task<QuerySnapshot>> shareTasks = new ArrayList<>();
+                    List<DocumentReference> propertyRefs = new ArrayList<>();
+                    for (DocumentSnapshot propertyDoc : propertiesSnapshot.getDocuments()) {
+                        DocumentReference propertyRef = propertyDoc.getReference();
+                        propertyRefs.add(propertyRef);
+                        shareTasks.add(propertyRef.collection("shares")
+                                .whereEqualTo("status", "ACCEPTED")
+                                .get());
+                    }
+
+                    Tasks.whenAllSuccess(shareTasks)
+                            .addOnSuccessListener(results -> {
+                                WriteBatch batch = firestore.batch();
+                                int updates = 0;
+
+                                for (int i = 0; i < results.size(); i++) {
+                                    Object result = results.get(i);
+                                    if (!(result instanceof QuerySnapshot)) {
+                                        continue;
+                                    }
+                                    QuerySnapshot shares = (QuerySnapshot) result;
+                                    List<String> tenantIds = new ArrayList<>();
+                                    for (DocumentSnapshot shareDoc : shares.getDocuments()) {
+                                        String tenantUid = shareDoc.getString("tenantUid");
+                                        if (tenantUid != null && !tenantUid.trim().isEmpty()) {
+                                            tenantIds.add(tenantUid.trim());
+                                        }
+                                    }
+                                    if (!tenantIds.isEmpty()) {
+                                        batch.update(propertyRefs.get(i), "tenantUids", FieldValue.arrayUnion(tenantIds.toArray()));
+                                        updates++;
+                                    }
+                                }
+
+                                if (updates == 0) {
+                                    Log.d(TAG, "Backfill: no tenantUids updates needed for ownerUid=" + ownerUid);
+                                    callback.onSuccess(0);
+                                    return;
+                                }
+
+                                batch.commit()
+                                        .addOnSuccessListener(unused -> {
+                                            Log.d(TAG, "Backfill: tenantUids updated for properties=" + updates + ", ownerUid=" + ownerUid);
+                                            callback.onSuccess(updates);
+                                        })
+                                        .addOnFailureListener(callback::onError);
+                            })
+                            .addOnFailureListener(callback::onError);
                 })
                 .addOnFailureListener(callback::onError);
     }
@@ -370,6 +472,25 @@ public class FirebaseRepository {
                     callback.onSuccess(new ArrayList<>(unique.values()));
                 })
                 .addOnFailureListener(callback::onError);
+    }
+
+    private void loadTenantPropertiesViaSharesFallback(@NonNull String uid, @NonNull RepoCallback<List<FirestoreProperty>> callback) {
+        firestore.collectionGroup("shares")
+                .whereEqualTo("tenantUid", uid)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot.isEmpty()) {
+                        Log.d(TAG, "TENANT shares fallback: no accepted share rows for uid=" + uid);
+                        callback.onSuccess(new ArrayList<>());
+                        return;
+                    }
+                    Log.d(TAG, "TENANT shares fallback rows=" + snapshot.size() + " for uid=" + uid);
+                    loadAcceptedPropertiesFromShares(snapshot, callback);
+                })
+                .addOnFailureListener(exception -> {
+                    Log.e(TAG, "TENANT shares fallback failed for uid=" + uid + ". Returning empty list.", exception);
+                    callback.onSuccess(new ArrayList<>());
+                });
     }
 
     private List<FirestoreMediaRecord> mapMedia(QuerySnapshot snapshot) {

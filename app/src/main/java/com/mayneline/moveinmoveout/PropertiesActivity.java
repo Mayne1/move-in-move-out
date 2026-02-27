@@ -3,6 +3,7 @@ package com.mayneline.moveinmoveout;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PropertiesActivity extends AppCompatActivity {
+    private static final String TAG = "PropertiesActivity";
     private FirebaseRepository repository;
     private FirebaseAuth auth;
     private SessionManager sessionManager;
@@ -112,7 +114,14 @@ public class PropertiesActivity extends AppCompatActivity {
 
             @Override
             public void onError(Exception exception) {
-                runOnUiThread(() -> textPropertiesStatus.setText("failed to load rows"));
+                Log.e(TAG, "Property load failed for role=" + role + ", uid=" + uid, exception);
+                runOnUiThread(() -> {
+                    if ("TENANT".equalsIgnoreCase(role)) {
+                        textPropertiesStatus.setText("Unable to load shared properties.");
+                    } else {
+                        textPropertiesStatus.setText("Unable to load properties.");
+                    }
+                });
             }
         });
     }
