@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Property Profile"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/textStep"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Step 1 of 3"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Flow Type" />
+
+            <TextView
+                android:id="@+id/textFlowTypeValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/stepBasics"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <Spinner
+                    android:id="@+id/spinnerDwellingType"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <EditText
+                    android:id="@+id/editAddressLine"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="Address Line"
+                    android:inputType="textPostalAddress" />
+
+                <EditText
+                    android:id="@+id/editUnit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="Unit (Optional)"
+                    android:inputType="text" />
+
+                <EditText
+                    android:id="@+id/editCity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="City"
+                    android:inputType="textCapWords" />
+
+                <EditText
+                    android:id="@+id/editState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="State"
+                    android:inputType="textCapCharacters" />
+
+                <EditText
+                    android:id="@+id/editZip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="ZIP"
+                    android:inputType="number" />
+
+                <EditText
+                    android:id="@+id/editSquareFeet"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="Square Feet (Optional)"
+                    android:inputType="number" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stepRooms"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/editBedrooms"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Bedrooms (number)"
+                    android:inputType="number" />
+
+                <EditText
+                    android:id="@+id/editBathrooms"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:hint="Bathrooms (number)"
+                    android:inputType="number" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Rooms"
+                    android:textStyle="bold" />
+
+                <CheckBox
+                    android:id="@+id/checkKitchen"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Kitchen" />
+
+                <CheckBox
+                    android:id="@+id/checkLivingRoom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Living Room" />
+
+                <CheckBox
+                    android:id="@+id/checkDiningRoom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Dining Room" />
+
+                <CheckBox
+                    android:id="@+id/checkGarage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Garage" />
+
+                <CheckBox
+                    android:id="@+id/checkYard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Yard" />
+
+                <CheckBox
+                    android:id="@+id/checkBalcony"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Balcony" />
+
+                <CheckBox
+                    android:id="@+id/checkLaundry"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Laundry Room" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stepFeatures"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Amenities"
+                    android:textStyle="bold" />
+
+                <CheckBox
+                    android:id="@+id/checkPool"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Pool" />
+
+                <CheckBox
+                    android:id="@+id/checkSprinklers"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Sprinklers" />
+
+                <CheckBox
+                    android:id="@+id/checkCentralAir"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Central Air" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Appliances"
+                    android:textStyle="bold" />
+
+                <CheckBox
+                    android:id="@+id/checkStoveOven"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Stove/Oven" />
+
+                <CheckBox
+                    android:id="@+id/checkRefrigerator"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Refrigerator" />
+
+                <CheckBox
+                    android:id="@+id/checkMicrowave"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Microwave" />
+
+                <CheckBox
+                    android:id="@+id/checkDishwasher"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Dishwasher" />
+
+                <CheckBox
+                    android:id="@+id/checkWasher"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Washer" />
+
+                <CheckBox
+                    android:id="@+id/checkDryer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Has Dryer" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/buttonBackStep"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Back" />
+
+        <Button
+            android:id="@+id/buttonNextStep"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="Next" />
+
+        <Button
+            android:id="@+id/buttonSaveProfile"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="Save &amp; Start"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout>

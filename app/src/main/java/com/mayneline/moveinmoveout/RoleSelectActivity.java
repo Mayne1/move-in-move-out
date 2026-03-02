@@ -59,7 +59,7 @@ public class RoleSelectActivity extends AppCompatActivity {
                 .set(data)
                 .addOnSuccessListener(unused -> {
                     sessionManager.setRole(role, "RoleSelectActivity#saveRoleSuccess");
-                    startActivity(new Intent(this, HomeActivity.class));
+                    startActivity(new Intent(this, IntentActivity.class));
                     finish();
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Failed to save role", Toast.LENGTH_SHORT).show());

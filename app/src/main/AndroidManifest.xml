@@ -19,6 +19,12 @@
             android:name=".InspectionWizardActivity"
             android:exported="false" />
         <activity
+            android:name=".PropertyProfileWizardActivity"
+            android:exported="false" />
+        <activity
+            android:name=".IntentActivity"
+            android:exported="false" />
+        <activity
             android:name=".PropertyProfileActivity"
             android:exported="false" />
         <activity

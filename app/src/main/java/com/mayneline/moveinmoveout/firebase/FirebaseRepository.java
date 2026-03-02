@@ -55,6 +55,40 @@ public class FirebaseRepository {
         public String zip;
     }
 
+    public static class PropertyProfileInput {
+        public String dwellingType;
+        public String addressLine;
+        public String unit;
+        public String city;
+        public String state;
+        public String zip;
+        public Integer squareFeet;
+
+        public int bedrooms;
+        public int bathrooms;
+        public boolean hasKitchen;
+        public boolean hasLivingRoom;
+        public boolean hasDiningRoom;
+        public boolean hasGarage;
+        public boolean hasYard;
+        public boolean hasBalcony;
+        public boolean hasLaundryRoom;
+
+        public boolean hasPool;
+        public boolean hasSprinklers;
+        public boolean hasCentralAir;
+
+        public boolean hasStoveOven;
+        public boolean hasRefrigerator;
+        public boolean hasMicrowave;
+        public boolean hasDishwasher;
+        public boolean hasWasher;
+        public boolean hasDryer;
+
+        public String flowType;
+        public long createdAtMs;
+    }
+
     public static class MediaInput {
         public String roomName;
         public String itemName;
@@ -118,6 +152,60 @@ public class FirebaseRepository {
         payload.put("denialReason", null);
         payload.put("createdAt", FieldValue.serverTimestamp());
         payload.put("lastUpdatedAt", FieldValue.serverTimestamp());
+
+        doc.set(payload)
+                .addOnSuccessListener(unused -> callback.onSuccess(doc.getId()))
+                .addOnFailureListener(callback::onError);
+    }
+
+    public void createPropertyProfile(@NonNull PropertyProfileInput input, @NonNull RepoCallback<String> callback) {
+        FirebaseUser user = auth.getCurrentUser();
+        if (user == null) {
+            callback.onError(new IllegalStateException("User not signed in"));
+            return;
+        }
+
+        DocumentReference doc = firestore.collection("propertyProfiles").document();
+
+        Map<String, Object> rooms = new HashMap<>();
+        rooms.put("bedrooms", input.bedrooms);
+        rooms.put("bathrooms", input.bathrooms);
+        rooms.put("hasKitchen", input.hasKitchen);
+        rooms.put("hasLivingRoom", input.hasLivingRoom);
+        rooms.put("hasDiningRoom", input.hasDiningRoom);
+        rooms.put("hasGarage", input.hasGarage);
+        rooms.put("hasYard", input.hasYard);
+        rooms.put("hasBalcony", input.hasBalcony);
+        rooms.put("hasLaundryRoom", input.hasLaundryRoom);
+
+        Map<String, Object> amenities = new HashMap<>();
+        amenities.put("hasPool", input.hasPool);
+        amenities.put("hasSprinklers", input.hasSprinklers);
+        amenities.put("hasCentralAir", input.hasCentralAir);
+
+        Map<String, Object> appliances = new HashMap<>();
+        appliances.put("hasStoveOven", input.hasStoveOven);
+        appliances.put("hasRefrigerator", input.hasRefrigerator);
+        appliances.put("hasMicrowave", input.hasMicrowave);
+        appliances.put("hasDishwasher", input.hasDishwasher);
+        appliances.put("hasWasher", input.hasWasher);
+        appliances.put("hasDryer", input.hasDryer);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("ownerUid", user.getUid());
+        payload.put("dwellingType", safe(input.dwellingType));
+        payload.put("addressLine", safe(input.addressLine));
+        payload.put("unit", safe(input.unit));
+        payload.put("city", safe(input.city));
+        payload.put("state", safe(input.state));
+        payload.put("zip", safe(input.zip));
+        payload.put("squareFeet", input.squareFeet);
+        payload.put("rooms", rooms);
+        payload.put("amenities", amenities);
+        payload.put("appliances", appliances);
+        payload.put("flowType", safe(input.flowType));
+        payload.put("createdAt", FieldValue.serverTimestamp());
+        payload.put("createdAtMs", input.createdAtMs > 0 ? input.createdAtMs : System.currentTimeMillis());
 
         doc.set(payload)
                 .addOnSuccessListener(unused -> callback.onSuccess(doc.getId()))

@@ -47,7 +47,7 @@ public class SignUpActivity extends AppCompatActivity {
                 .addOnSuccessListener(result -> {
                     sessionManager.updateUser(result.getUser(), "SignUpActivity#signUpSuccess");
                     Toast.makeText(this, "Account created", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(this, RoleSelectActivity.class);
+                    Intent intent = new Intent(this, IntentActivity.class);
                     startActivity(intent);
                     finish();
                 })

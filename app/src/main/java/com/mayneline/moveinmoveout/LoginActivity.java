@@ -79,7 +79,7 @@ public class LoginActivity extends AppCompatActivity {
         String role = snapshot.getString("role");
         sessionManager.setRole(role, "LoginActivity#routeFromUserDoc");
 
-        startActivity(new Intent(this, HomeActivity.class));
+        startActivity(new Intent(this, IntentActivity.class));
         finish();
     }
 
